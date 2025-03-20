@@ -1,6 +1,7 @@
 // src/app.js
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const db = require('./config/db');
 
 const app = express();
@@ -8,6 +9,9 @@ const app = express();
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Configurar servicio de archivos estáticos para imágenes
+app.use('/images', express.static(path.join(__dirname, '../public')));
 
 // Ruta principal
 app.get('/', (req, res) => {
@@ -114,9 +118,12 @@ app.post('/api/auth/login', async (req, res) => {
     const { email, password } = req.body;
     console.log('Intento de login con:', { email });
     
-    // Buscar usuario por nombre de usuario
+    // Buscar usuario por correo electrónico usando JOIN con tdDetallesUsuario
     const [users] = await db.query(
-      'SELECT * FROM tcUsuario WHERE cNombreUsuario = ?',
+      `SELECT u.*, d.cCorreo, d.cNombreCompleto 
+       FROM tdUsuario u
+       INNER JOIN tdDetallesUsuario d ON u.iIdUsuario = d.iIdUsuario
+       WHERE d.cCorreo = ?`,
       [email]
     );
     
@@ -146,19 +153,32 @@ app.post('/api/auth/login', async (req, res) => {
     
     const roleName = roles.length > 0 ? roles[0].cNombreRol : 'Usuario';
     
-    // Login exitoso - enviar información del usuario (sin token por ahora)
+    // Login exitoso - enviar información del usuario
     console.log('Login exitoso para usuario:', user.cNombreUsuario);
     
-    res.status(200).json({
+    // Protección contra propiedades posiblemente indefinidas
+    const safeResponse = {
       user: {
         iIdUsuario: user.iIdUsuario,
-        cNombreUsuario: user.cNombreUsuario,
-        iIdRol: user.iIdRol,
-        nombreRol: roleName,
-        iIdUniversidad: user.iIdUniversidad
+        cNombreUsuario: user.cNombreUsuario || '',
+        cNombreCompleto: user.cNombreCompleto || '',
+        cCorreo: user.cCorreo || '',
+        iIdRol: user.iIdRol || null,
+        nombreRol: roleName || 'Usuario',
+        iIdUniversidad: user.iIdUniversidad || null
       }
-    });
+    };
     
+    // Si existe cImagen, añadirla al objeto de respuesta con la ruta completa
+    if (user.cImagen) {
+      // Construir la URL base del servidor
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const imageUrl = `${baseUrl}/images/${user.cImagen}`;
+      safeResponse.user.cImagen = `${baseUrl}/images/${user.cImagen}`;
+      console.log('URL de imagen generada:', imageUrl);
+    }
+    
+    res.status(200).json(safeResponse);
   } catch (error) {
     console.error('Error en login:', error);
     res.status(500).json({ 
@@ -253,6 +273,14 @@ app.get('/api/reportes/todas', async (req, res) => {
   }
 });
 
+// Manejador de errores global
+app.use((err, req, res, next) => {
+  console.error('Error no capturado:', err);
+  res.status(500).json({
+    message: 'Error interno del servidor',
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
+});
 
 // Exportar la app
 module.exports = app;
