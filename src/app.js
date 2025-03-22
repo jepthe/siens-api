@@ -27,8 +27,10 @@ app.get('/api/reportes/pdf', async (req, res) => {
   const pdfPath = path.join(tmpDir, pdfFileName);
   
   try {
-    const { anios, semanas } = req.query;
-    console.log('Generando PDF con parámetros:', { anios, semanas });
+    const { anios, semanas, usuario } = req.query;
+    const nombreUsuario = usuario || 'Usuario'; // Valor por defecto
+    console.log('Generando PDF con parámetros:', { anios, semanas, usuario: nombreUsuario });
+    
     
     // Convertir parámetros a formato adecuado (corrigiendo el error)
     const aniosArray = Array.isArray(anios) ? anios.map(Number) : [Number(anios)];
@@ -53,7 +55,8 @@ app.get('/api/reportes/pdf', async (req, res) => {
     const doc = new PDFDocument({ 
       margin: 50,
       size: 'A4',
-      layout: 'landscape' // Para tablas más anchas
+      layout: 'landscape', // Para tablas más anchas
+      bufferPages: true // Asegúrate de que esto esté habilitado
     });
     
     // Crear un stream para guardar el archivo
@@ -68,9 +71,25 @@ app.get('/api/reportes/pdf', async (req, res) => {
     });
     
     doc.moveDown();
-    doc.fontSize(12).text(`Fecha: ${new Date().toLocaleDateString()}`, { align: 'right' });
-    doc.fontSize(12).text(`Años seleccionados: ${aniosArray.join(', ')}`, { align: 'left' });
-    doc.fontSize(12).text(`Semanas: 1-${semanasNum}`, { align: 'left' });
+    const currentDate = new Date();
+    // Formatear la fecha en dd/mm/yyyy
+    const day = String(currentDate.getDate()).padStart(2, '0');
+    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+    const year = currentDate.getFullYear();
+    const formattedDate = `${day}/${month}/${year}`;
+
+    // Formatear la hora
+    const hours = String(currentDate.getHours()).padStart(2, '0');
+    const minutes = String(currentDate.getMinutes()).padStart(2, '0');
+    const seconds = String(currentDate.getSeconds()).padStart(2, '0');
+    const formattedTime = `${hours}:${minutes}:${seconds}`;
+
+
+    const totalPages = doc.bufferedPageRange().count;
+
+    doc.fontSize(6)
+      .text(`Fecha: ${formattedDate} | Hora: ${formattedTime}`, { align: 'right' })
+      .text(`Generado por: ${nombreUsuario} | Páginas: ${totalPages}`, { align: 'right' });
     
     doc.moveDown(2);
     
@@ -90,15 +109,64 @@ app.get('/api/reportes/pdf', async (req, res) => {
       
       // Primer nivel de encabezado (universidades)
       let x = 50;
-      doc.fillColor('#e6e6e6').rect(x, startY, weekColWidth, 30).fill();
+      doc.fillColor('#FFFFFF').rect(x, startY, weekColWidth, 30).fill();
       doc.fillColor('black').fontSize(10).text('Semana', x + 5, startY + 10, { width: weekColWidth - 10, align: 'center' });
       
       x += weekColWidth;
+      //images logos
+      // Mapa de rutas para las imágenes de universidades
+      const universityImages = {
+        'UTSJR': path.join(__dirname, '../public/universidades/LOGO_UTSJR.png'),
+        'UTC': path.join(__dirname, '../public/universidades/LOGO_UTC.png'),
+        'UTEQ': path.join(__dirname, '../public/universidades/LOGO_UTEQ.png'),
+        'UNAQ': path.join(__dirname, '../public/universidades/LOGO_UNAQ.png'),
+        'UPQ': path.join(__dirname, '../public/universidades/LOGO_UPQ.png'),
+        'UPSRJ': path.join(__dirname, '../public/universidades/LOGO_UPSRJ.png')
+      };
       
       UNIVERSITIES.forEach(uni => {
         const uniColWidth = dataColWidth * aniosArray.length;
-        doc.fillColor('#e6e6e6').rect(x, startY, uniColWidth, 30).fill();
-        doc.fillColor('black').fontSize(10).text(uni, x + 5, startY + 10, { width: uniColWidth - 10, align: 'center' });
+        // Dibuja un fondo para el encabezado
+        doc.fillColor('#FFFFFF').rect(x, startY, uniColWidth, 30).fill();
+        
+        // Intenta cargar y añadir la imagen
+        try {
+          if (universityImages[uni] && fs.existsSync(universityImages[uni])) {
+            // Calcula dimensiones para la imagen (mantener proporción y ajustar al espacio)
+            const maxHeight = 25; // altura máxima de la imagen
+            const maxWidth = uniColWidth - 10; // ancho máximo con margen
+            
+            // Dibuja la imagen en el centro del encabezado
+            doc.image(
+              universityImages[uni], 
+              x + (uniColWidth - maxWidth)/2, // centrar horizontalmente
+              startY + 2.5, // pequeño margen superior
+              { 
+                fit: [maxWidth, maxHeight],
+                align: 'center',
+                valign: 'center'
+              }
+            );
+          } else {
+            // Si no existe la imagen, mostrar el nombre como respaldo
+            doc.fillColor('black').fontSize(9).text(
+              uni, 
+              x + 5, 
+              startY + 10, 
+              { width: uniColWidth - 10, align: 'center' }
+            );
+          }
+        } catch (imgError) {
+          console.error(`Error al cargar imagen para ${uni}:`, imgError);
+          // Si hay error, mostrar el nombre
+          doc.fillColor('black').fontSize(9).text(
+            uni, 
+            x + 5, 
+            startY + 10, 
+            { width: uniColWidth - 10, align: 'center' }
+          );
+        }
+        
         x += uniColWidth;
       });
       
@@ -263,14 +331,6 @@ app.get('/api/reportes/pdf', async (req, res) => {
       }
     });
     
-    // Pie de página
-    doc.fontSize(8);
-    doc.text(
-      `Reporte generado el ${new Date().toLocaleDateString()}`,
-      50,
-      doc.page.height - 30,
-      { align: 'center' }
-    );
     
     // Finalizar el documento
     doc.end();
