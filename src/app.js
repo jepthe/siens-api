@@ -381,6 +381,8 @@ app.get('/api/reportes/pdf', async (req, res) => {
   }
 });
 
+const authRoutes = require('./routes/authRoutes');
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -647,6 +649,8 @@ app.get('/api/reportes/todas', async (req, res) => {
     res.status(500).json({ message: 'Error interno del servidor' });
   }
 });
+
+app.use('/api/auth', authRoutes);
 
 // Manejador de errores global
 app.use((err, req, res, next) => {
