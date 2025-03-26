@@ -339,27 +339,18 @@ app.get('/api/reportes/pdf', async (req, res) => {
     stream.on('finish', () => {
       console.log(`PDF generado correctamente: ${pdfPath}`);
       
-      // Construir la URL para acceder al archivo
-      const fileUrl = `${req.protocol}://${req.get('host')}/tmp/${pdfFileName}`;
+      // En lugar de devolver una URL:
+      const pdfContent = fs.readFileSync(pdfPath);
       
-      // Devolver la información al cliente
-      res.json({
-        success: true,
-        url: fileUrl,
-        fileName: pdfFileName,
-        message: 'PDF generado correctamente'
-      });
+      // Eliminar el archivo temporal inmediatamente después de leerlo
+      fs.unlinkSync(pdfPath);
       
-      // Programar la eliminación del archivo después de 30 minutos
-      setTimeout(() => {
-        try {
-          if (fs.existsSync(pdfPath)) {
-            fs.unlinkSync(pdfPath);
-          }
-        } catch (unlinkError) {
-          console.error('Error al eliminar archivo temporal:', unlinkError);
-        }
-      }, 30 * 60 * 1000); // 30 minutos
+      // Configurar encabezados para descarga
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="reporte_${Date.now()}.pdf"`);
+      
+      // Enviar el PDF
+      res.send(pdfContent);
     });
     
   } catch (error) {
