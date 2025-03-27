@@ -540,10 +540,15 @@ app.post('/api/auth/login', async (req, res) => {
     // Si existe cImagen, añadirla al objeto de respuesta con la ruta completa
     if (user.cImagen) {
       // Construir la URL base del servidor
-      const imageUrl = `${req.protocol}://${req.get('host')}/images/${user.cImagen}`;
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      // Asegurarse de que la URL comience con https://
+      const imageUrl = user.cImagen.startsWith('http')
+        ? user.cImagen
+        : `${baseUrl}/images/${user.cImagen}`;
       safeResponse.user.cImagen = imageUrl;
       console.log('URL de imagen generada:', imageUrl);
     }
+    
     
     res.status(200).json(safeResponse);
   } catch (error) {
