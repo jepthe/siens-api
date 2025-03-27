@@ -5,7 +5,7 @@ const path = require('path');
 const db = require('./config/db');
 
 require('dotenv').config();
-const PRODUCTION_URL = process.env.API_URL || 'https://siens-api-production.up.railway.app';
+const PRODUCTION_URL = process.env.API_URL;
 
 const app = express();
 
