@@ -542,7 +542,7 @@ app.post('/api/auth/login', async (req, res) => {
       // Construir la URL base del servidor
       const baseUrl = `${req.protocol}://${req.get('host')}`;
       // Asegurarse de que la URL comience con https://
-      const imageUrl = user.cImagen.startsWith('https')
+      const imageUrl = user.cImagen.startsWith('http')
         ? user.cImagen
         : `${baseUrl}/images/${user.cImagen}`;
       safeResponse.user.cImagen = imageUrl;
