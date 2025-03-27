@@ -4,6 +4,9 @@ const cors = require('cors');
 const path = require('path');
 const db = require('./config/db');
 
+require('dotenv').config();
+const PRODUCTION_URL = process.env.API_URL || 'https://siens-api-production.up.railway.app';
+
 const app = express();
 
 //pdf
@@ -543,15 +546,15 @@ app.post('/api/auth/login', async (req, res) => {
       const isProduction = process.env.NODE_ENV === 'production' || 
                             req.get('host').includes('railway.app');
       
-      // Construir la URL base adecuada
+      // Construir la URL base adecuada usando la constante
       const baseUrl = isProduction
-        ? 'https://siens-api-production.up.railway.app'  // URL fija de producción
-        : `${req.protocol}://${req.get('host')}`;        // URL local para desarrollo
+        ? PRODUCTION_URL  // Usar la constante definida arriba
+        : `${req.protocol}://${req.get('host')}`;
       
       // Construir la URL completa de la imagen
       const imageUrl = user.cImagen.startsWith('http')
-        ? user.cImagen.replace(/^http:\/\//i, 'https://') // Forzar HTTPS si ya es una URL
-        : `${baseUrl}/images/${user.cImagen}`;           // Construir URL completa
+        ? user.cImagen.replace(/^http:\/\//i, 'https://')
+        : `${baseUrl}/images/${user.cImagen}`;
       
       safeResponse.user.cImagen = imageUrl;
       console.log('URL de imagen generada:', imageUrl);
