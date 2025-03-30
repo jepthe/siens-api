@@ -5,7 +5,7 @@ const path = require('path');
 const db = require('./config/db');
 
 require('dotenv').config();
-const PRODUCTION_URL = process.env.API_URL;
+const PRODUCTION_URL = process.env.API_URL || 'https://siens-api-production.up.railway.app';//por si no se define la variable de entorno, resuelve imagen perfil
 
 const app = express();
 
