@@ -540,24 +540,27 @@ app.post('/api/auth/login', async (req, res) => {
       }
     };
     
-    // Si existe cImagen, añadirla al objeto de respuesta con la ruta completa
+    // If existe cImagen, añadirla al objeto de respuesta con la ruta completa
     if (user.cImagen) {
-      // Detectar si estamos usando Railway u otro entorno de producción
-      const isProduction = process.env.NODE_ENV === 'production' || 
-                            req.get('host').includes('railway.app');
+      // Ensure we're using HTTPS for production
+      const baseUrl = process.env.API_URL || 'https://siens-api-production.up.railway.app';
       
-      // Construir la URL base adecuada usando la constante
-      const baseUrl = isProduction
-        ? PRODUCTION_URL  // Usar la constante definida arriba
-        : `${req.protocol}://${req.get('host')}`;
+      // Properly format the image URL
+      // If it's already a full URL
+      if (user.cImagen.startsWith('http://') || user.cImagen.startsWith('https://')) {
+        // Force HTTPS for security
+        safeResponse.user.cImagen = user.cImagen.replace(/^http:\/\//i, 'https://');
+      } 
+      // If it starts with /images/ 
+      else if (user.cImagen.startsWith('/images/')) {
+        safeResponse.user.cImagen = `${baseUrl}${user.cImagen}`;
+      }
+      // Otherwise it's just a filename
+      else {
+        safeResponse.user.cImagen = `${baseUrl}/images/${user.cImagen}`;
+      }
       
-      // Construir la URL completa de la imagen
-      const imageUrl = user.cImagen.startsWith('http')
-        ? user.cImagen.replace(/^http:\/\//i, 'https://')
-        : `${baseUrl}/images/${user.cImagen}`;
-      
-      safeResponse.user.cImagen = imageUrl;
-      console.log('URL de imagen generada:', imageUrl);
+      console.log('URL de imagen generada:', safeResponse.user.cImagen);
     }
     
     

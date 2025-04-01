@@ -44,17 +44,9 @@ const login = asyncHandler(async (req, res) => {
 
   // 3) Si la contraseña está en texto plano, hashearla automáticamente
   if (isPlainTextPassword) {
-    console.log('Contraseña en texto plano detectada para usuario:', user.cNombreUsuario);
-    console.log('Contraseña actual:', user.cContraseña);
-    console.log('Iniciando proceso de hasheo automático...');
     try {
       // Actualizamos la contraseña a una versión hasheada
       await userModel.upgradePasswordToHashed(user.iIdUsuario, password);
-      console.log('Contraseña hasheada con éxito');
-      
-      // Verificar la actualización
-      const updatedUser = await userModel.findByEmail(username);
-      console.log('Contraseña actualizada en la BD:', updatedUser.cContraseña);
     } catch (error) {
       console.error('Error al actualizar contraseña a versión hasheada:', error);
     }
@@ -67,7 +59,25 @@ const login = asyncHandler(async (req, res) => {
     universidadId: user.iIdUniversidad
   });
 
-  // 5) Enviar respuesta con token y datos del usuario
+  // 5) Procesar la URL de la imagen si existe
+  let imageUrl = user.cImagen;
+  if (imageUrl) {
+    const baseUrl = process.env.API_URL || 'https://siens-api-production.up.railway.app';
+    
+    // Formatear correctamente la URL de la imagen
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      // Forzar HTTPS por seguridad
+      imageUrl = imageUrl.replace(/^http:\/\//i, 'https://');
+    } 
+    else if (imageUrl.startsWith('/images/')) {
+      imageUrl = `${baseUrl}${imageUrl}`;
+    }
+    else {
+      imageUrl = `${baseUrl}/images/${imageUrl}`;
+    }
+  }
+
+  // 6) Enviar respuesta con token y datos del usuario
   res.status(200).json({
     status: 'success',
     token,
@@ -77,12 +87,12 @@ const login = asyncHandler(async (req, res) => {
       iIdRol: user.iIdRol,
       nombreRol: user.nombreRol,
       iIdUniversidad: user.iIdUniversidad,
-      cImagen: user.cImagen
+      cImagen: imageUrl
     }
   });
 });
 
-// Función para generar una contraseña aleatoria segura
+// Resto del controlador permanece igual
 const generateRandomPassword = async () => {
   // Genera una contraseña de 10 caracteres: letras mayúsculas, minúsculas y números
   const length = 10;
@@ -137,8 +147,6 @@ const resetPassword = asyncHandler(async (req, res) => {
   const newPassword = await generateRandomPassword();
   
   // 3) Actualizar la contraseña en la base de datos 
-  // Guardar en texto plano para que el usuario pueda usarla después de recibir el correo
-  // El sistema la hasheará automáticamente después del primer inicio de sesión
   await userModel.updatePassword(user.iIdUsuario, newPassword);
 
   // 4) Enviar la nueva contraseña por correo electrónico
