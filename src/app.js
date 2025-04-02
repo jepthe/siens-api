@@ -28,16 +28,21 @@ if (!fs.existsSync(tmpDir)) {
 app.use('/tmp', express.static(path.join(__dirname, '../tmp')));
 
 // Endpoint para generar PDF
+// Solución completa para el endpoint de generación de PDF
+
 app.get('/api/reportes/pdf', async (req, res) => {
   const pdfFileName = `reporte_${Date.now()}.pdf`;
   const pdfPath = path.join(tmpDir, pdfFileName);
   
   try {
-    const { anios, semanas, usuario, timezone } = req.query;
+    const { anios, semanas, usuario, fechaLocal, horaLocal } = req.query;
     const nombreUsuario = usuario || 'Usuario'; // Valor por defecto
-
-    // Verifica y registra la zona horaria recibida para depuración
-    console.log('Zona horaria recibida del cliente:', timezone);
+    
+    // Usar fecha y hora enviadas desde el cliente si están disponibles
+    const usingClientTime = !!(fechaLocal && horaLocal);
+    
+    console.log('=== INICIANDO GENERACIÓN DE PDF ===');
+    console.log('Parámetros recibidos:', { anios, semanas, usuario, fechaLocal, horaLocal });
     
     // Convertir parámetros a formato adecuado
     const aniosArray = Array.isArray(anios) ? anios.map(Number) : [Number(anios)];
@@ -45,9 +50,21 @@ app.get('/api/reportes/pdf', async (req, res) => {
     
     // Obtener los datos para el reporte
     let reporteData = {};
-    
     try {
       reporteData = await fichaModel.getReporteTodasUniversidades(aniosArray, semanasNum);
+      console.log('Datos obtenidos para las universidades:', Object.keys(reporteData));
+      console.log('Estructura de datos de ejemplo:');
+      if (Object.keys(reporteData).length > 0) {
+        const primerUniversidad = Object.keys(reporteData)[0];
+        console.log(`Ejemplo de datos para ${primerUniversidad}:`, {
+          tieneRegular: !!reporteData[primerUniversidad].regular,
+          tieneAcumulado: !!reporteData[primerUniversidad].acumulado,
+          cantidadDatosRegular: reporteData[primerUniversidad].regular?.length || 0,
+          cantidadDatosAcumulado: reporteData[primerUniversidad].acumulado?.length || 0,
+          ejemploRegular: reporteData[primerUniversidad].regular?.[0] || 'No hay datos',
+          ejemploAcumulado: reporteData[primerUniversidad].acumulado?.[0] || 'No hay datos'
+        });
+      }
     } catch (dataError) {
       console.error('Error al obtener datos para el PDF:', dataError);
       reporteData = { UTSJR: { regular: [], acumulado: [] } };
@@ -55,79 +72,58 @@ app.get('/api/reportes/pdf', async (req, res) => {
     
     // Obtener la lista de universidades
     const UNIVERSITIES = Object.keys(reporteData);
+    console.log('Universidades en los datos:', UNIVERSITIES);
     
     // Crear el documento PDF
     const doc = new PDFDocument({ 
       margin: 50,
       size: 'A4',
-      layout: 'landscape',
-      bufferPages: true
+      layout: 'landscape', // Para tablas más anchas
+      bufferPages: true // Asegúrate de que esto esté habilitado
     });
     
+    // Crear un stream para guardar el archivo
     const stream = fs.createWriteStream(pdfPath);
+    
+    // Pipe el documento al stream de archivo
     doc.pipe(stream);
     
     // Título del reporte
-    doc.fontSize(24).text('Reporte de Todas las Universidades', {
+    doc.fontSize(24).text('Concentrado de Universidades', {
       align: 'center'
     });
     
     doc.moveDown();
     
-    // Fecha y hora actual en la zona horaria del cliente
-    let formattedDate, formattedTime, clientTimeZone;
+    // Usar fecha y hora del cliente o del servidor
+    let formattedDate, formattedTime, timeSource;
     
-    try {
-      // Si hay una zona horaria del cliente, usarla
-      if (timezone) {
-        const clientDate = new Date();
-        // Ajustar manualmente la fecha según el offset de zona horaria
-        const clientOffset = parseFloat(timezone) || 0;
-        const serverOffset = clientDate.getTimezoneOffset() * -1 / 60; // Convertir de minutos a horas
-        const offsetDiff = clientOffset - serverOffset;
-        
-        // Ajustar la fecha según la diferencia de offset
-        clientDate.setHours(clientDate.getHours() + offsetDiff);
-        
-        // Formato: DD/MM/YYYY
-        formattedDate = `${String(clientDate.getDate()).padStart(2, '0')}/${String(clientDate.getMonth() + 1).padStart(2, '0')}/${clientDate.getFullYear()}`;
-        
-        // Formato: HH:MM:SS
-        formattedTime = `${String(clientDate.getHours()).padStart(2, '0')}:${String(clientDate.getMinutes()).padStart(2, '0')}:${String(clientDate.getSeconds()).padStart(2, '0')}`;
-        
-        clientTimeZone = `GMT${timezone >= 0 ? '+' : ''}${timezone}`;
-      } else {
-        // Si no hay zona horaria del cliente, usar la hora del servidor
-        const serverDate = new Date();
-        formattedDate = `${String(serverDate.getDate()).padStart(2, '0')}/${String(serverDate.getMonth() + 1).padStart(2, '0')}/${serverDate.getFullYear()}`;
-        formattedTime = `${String(serverDate.getHours()).padStart(2, '0')}:${String(serverDate.getMinutes()).padStart(2, '0')}:${String(serverDate.getSeconds()).padStart(2, '0')}`;
-        clientTimeZone = 'Servidor';
-      }
-    } catch (timeError) {
-      console.error('Error al procesar zona horaria:', timeError);
-      // En caso de error, usar la hora del servidor
-      const fallbackDate = new Date();
-      formattedDate = `${String(fallbackDate.getDate()).padStart(2, '0')}/${String(fallbackDate.getMonth() + 1).padStart(2, '0')}/${fallbackDate.getFullYear()}`;
-      formattedTime = `${String(fallbackDate.getHours()).padStart(2, '0')}:${String(fallbackDate.getMinutes()).padStart(2, '0')}:${String(fallbackDate.getSeconds()).padStart(2, '0')}`;
-      clientTimeZone = 'Servidor (fallback)';
+    if (usingClientTime) {
+      // Usar los valores enviados desde el cliente
+      formattedDate = fechaLocal;
+      formattedTime = horaLocal;
+      timeSource = 'Cliente';
+    } else {
+      // Usar la fecha y hora del servidor
+      const serverDate = new Date();
+      formattedDate = `${String(serverDate.getDate()).padStart(2, '0')}/${String(serverDate.getMonth() + 1).padStart(2, '0')}/${serverDate.getFullYear()}`;
+      formattedTime = `${String(serverDate.getHours()).padStart(2, '0')}:${String(serverDate.getMinutes()).padStart(2, '0')}:${String(serverDate.getSeconds()).padStart(2, '0')}`;
+      timeSource = 'Servidor';
     }
 
-    const totalPages = doc.bufferedPageRange().count;
-
-    // Añadir información al PDF con la zona horaria
+    // Información del documento
     doc.fontSize(6)
-      .text(`Fecha: ${formattedDate} | Hora: ${formattedTime} | Zona: ${clientTimeZone}`, { align: 'right' })
-      .text(`Generado por: ${nombreUsuario} | Páginas: ${totalPages}`, { align: 'right' });
-    
+      .text(`Fecha: ${formattedDate} | Hora: ${formattedTime} | Fuente: ${timeSource}`, { align: 'right' })
+      .text(`Generado por: ${nombreUsuario}`, { align: 'right' });
     
     doc.moveDown(2);
     
-    // Dibujar tabla combinada (similar a AllModulesScreen)
+    // Dibujar tabla combinada
     const tableTop = doc.y;
     const tableWidth = doc.page.width - 100; // Ancho total de la tabla
     
-    // Calcular el ancho para cada columna de universidad+año
-    const cellsCount = 1 + (UNIVERSITIES.length * aniosArray.length); // 1 para la columna de semana
+    // Calcular el ancho para cada columna
+    const cellsCount = 1 + (UNIVERSITIES.length * aniosArray.length);
     const baseColWidth = tableWidth / cellsCount;
     const weekColWidth = baseColWidth;
     const dataColWidth = baseColWidth;
@@ -218,23 +214,73 @@ app.get('/api/reportes/pdf', async (req, res) => {
     let currentY = drawTableHeader();
     
     // Preparar los datos para combinar en filas
-    // Primero, encontramos todas las semanas únicas
+    // Encontrar todas las semanas únicas - con manejo más detallado
     const allSemanas = new Set();
-    Object.values(reporteData).forEach(uniData => {
-      if (uniData && uniData.regular) {
-        uniData.regular.forEach(item => {
-          if (item && item.semana && item.semana <= semanasNum) {
+
+    // Primero, comprueba si hay datos para depuración
+    let hayDatosParaAlgunaUniversidad = false;
+
+    Object.entries(reporteData).forEach(([universidad, datos]) => {
+      console.log(`Procesando datos para ${universidad}:`);
+      
+      if (!datos) {
+        console.log(`- No hay datos para ${universidad}`);
+        return;
+      }
+      
+      // Verificar si hay datos regulares
+      if (!datos.regular || !Array.isArray(datos.regular) || datos.regular.length === 0) {
+        console.log(`- No hay datos regulares para ${universidad}`);
+      } else {
+        console.log(`- Hay ${datos.regular.length} registros regulares para ${universidad}`);
+        hayDatosParaAlgunaUniversidad = true;
+        
+        // Extraer semanas de datos regulares
+        datos.regular.forEach(item => {
+          if (item && typeof item.semana === 'number' && item.semana <= semanasNum) {
             allSemanas.add(item.semana);
+            console.log(`  - Añadida semana ${item.semana} de datos regulares`);
+          } else if (item) {
+            console.log(`  - Dato regular inválido: ${JSON.stringify(item)}`);
           }
         });
       }
     });
+
+    // Si no hay semanas detectadas, crear semanas manualmente
+    if (allSemanas.size === 0) {
+      console.log('No se detectaron semanas en los datos. Creando semanas manualmente...');
+      
+      if (hayDatosParaAlgunaUniversidad) {
+        console.log('Hay datos pero no se detectaron semanas correctamente. Posible problema de estructura.');
+      } else {
+        console.log('No hay datos para ninguna universidad. Creando semanas de respaldo.');
+      }
+      
+      // Crear semanas manualmente del 1 al número de semanas solicitado
+      for (let i = 1; i <= semanasNum; i++) {
+        allSemanas.add(i);
+        console.log(`Añadida semana ${i} manualmente`);
+      }
+    }
     
     // Convertir a array y ordenar
     const uniqueSemanas = Array.from(allSemanas).sort((a, b) => a - b);
-    
-    // Dibujar filas de datos
+    console.log('Semanas únicas detectadas finalmente:', uniqueSemanas);
+    console.log('Total de semanas a dibujar:', uniqueSemanas.length);
+
+    // 3. En la parte donde se dibujan las filas de datos, asegúrate de manejar datos vacíos
     uniqueSemanas.forEach((semana, index) => {
+      // Log por cada semana para ser más exhaustivos en la depuración
+      console.log(`Dibujando semana ${semana} (fila ${index + 1} de ${uniqueSemanas.length})`);
+      
+      // Verificar si necesitamos una nueva página
+      if (currentY > doc.page.height - 100) {
+        doc.addPage();
+        currentY = drawTableHeader(); // Redibuja los encabezados en la nueva página
+        console.log('Añadida nueva página, nueva posición Y:', currentY);
+      }
+      
       const rowY = currentY;
       let x = 50;
       
@@ -251,15 +297,24 @@ app.get('/api/reportes/pdf', async (req, res) => {
         const uniData = reporteData[uni];
         
         aniosArray.forEach(year => {
-          // Buscar datos para esta semana y año
+          // Buscar datos para esta semana y año (con más logs)
           let value = 0;
-          if (uniData && uniData.regular) {
+          let dataFound = false;
+          
+          if (uniData && uniData.regular && Array.isArray(uniData.regular)) {
             const data = uniData.regular.find(item => 
               item && item.semana === semana && item.anio === year
             );
+            
             if (data) {
               value = data.cantidad || 0;
+              dataFound = true;
             }
+          }
+          
+          // Si es la primera universidad o la última semana, log para depuración
+          if (uni === UNIVERSITIES[0] || index === uniqueSemanas.length - 1) {
+            console.log(`  - Valor para ${uni}, año ${year}, semana ${semana}: ${value} (${dataFound ? 'encontrado' : 'no encontrado'})`);
           }
           
           doc.fillColor('black').fontSize(9).text(value.toString(), x + 5, rowY + 5, { width: dataColWidth - 10, align: 'center' });
@@ -267,8 +322,18 @@ app.get('/api/reportes/pdf', async (req, res) => {
         });
       });
       
-      currentY += 20;
+      currentY += 20; // Incrementar la posición Y para la siguiente fila
+      
+      // Asegurarse de dibujar las líneas horizontales para cada fila
+      doc.moveTo(50, currentY).lineTo(50 + tableWidth, currentY).stroke();
     });
+    
+    // Después de todas las filas de datos, verifica si necesitas una nueva página para los totales
+    if (currentY > doc.page.height - 100) {
+      doc.addPage();
+      currentY = drawTableHeader(); // Redibuja los encabezados en la nueva página
+      console.log('Añadida nueva página para totales, nueva posición Y:', currentY);
+    }
     
     // Dibujar fila de totales
     const totalsRowY = currentY;
@@ -344,13 +409,6 @@ app.get('/api/reportes/pdf', async (req, res) => {
     // Línea antes de los totales
     doc.moveTo(50, totalsRowY).lineTo(50 + tableWidth, totalsRowY).stroke();
     
-    // Líneas para cada fila de datos
-    let rowY = tableTop + 55 + 20;
-    while (rowY < totalsRowY) {
-      doc.moveTo(50, rowY).lineTo(50 + tableWidth, rowY).stroke();
-      rowY += 20;
-    }
-    
     // Líneas verticales para las columnas de año
     x = 50 + weekColWidth;
     UNIVERSITIES.forEach(uni => {
@@ -360,6 +418,16 @@ app.get('/api/reportes/pdf', async (req, res) => {
       }
     });
     
+    console.log('=== FINALIZANDO PDF ===');
+    console.log('Posición Y final:', totalsRowY + 25);
+    console.log('Altura de página:', doc.page.height);
+    
+    // Numerar páginas
+    const totalPages = doc.bufferedPageRange().count;
+    for (let i = 0; i < totalPages; i++) {
+      doc.switchToPage(i);
+      doc.fontSize(6).text(`Página ${i + 1} de ${totalPages}`, 50, doc.page.height - 50, { align: 'center' });
+    }
     
     // Finalizar el documento
     doc.end();
@@ -367,6 +435,7 @@ app.get('/api/reportes/pdf', async (req, res) => {
     // Esperar a que se complete la escritura del documento
     stream.on('finish', () => {
       console.log(`PDF generado correctamente: ${pdfPath}`);
+      console.log(`Tamaño del archivo PDF: ${fs.statSync(pdfPath).size} bytes`);
       
       // En lugar de devolver una URL:
       const pdfContent = fs.readFileSync(pdfPath);

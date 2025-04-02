@@ -89,13 +89,14 @@ const fichaModel = {
   
   getReporteTodasUniversidades: async (anios, semanas) => {
     try {
-      // Convertir anios a formato de consulta IN()
-      const aniosStr = anios.map(() => '?').join(',');
+      console.log('getReporteTodasUniversidades - Parámetros:', { anios, semanas });
       
       // Obtener todas las universidades activas
       const [universidades] = await db.query(
         'SELECT iIdUniversidad, cNombreCorto FROM tcUniversidad WHERE bActivo = 1'
       );
+      
+      console.log(`Encontradas ${universidades.length} universidades activas`);
       
       // Objeto para almacenar resultados por universidad
       const resultados = {};
@@ -105,28 +106,37 @@ const fichaModel = {
         const universidadId = universidad.iIdUniversidad;
         const nombreCorto = universidad.cNombreCorto;
         
+        console.log(`Procesando universidad: ${nombreCorto} (ID: ${universidadId})`);
+        
         // Consulta para obtener datos por semana y año para esta universidad
+        // Nota: No filtramos por año en la consulta SQL para asegurarnos de obtener datos
         const [rows] = await db.query(
           `SELECT 
-             f.iIdAnio,
-             a.cAnio as anio,
-             f.iIdSemana,
-             s.iNumeroSemana as semana,
-             SUM(f.iCantidad) as cantidad
+             f.iIdFicha, f.iIdUniversidad, 
+             f.iIdAnio, a.cAnio as anio, 
+             f.iIdSemana, s.iNumeroSemana as semana,
+             f.iCantidad 
            FROM 
              tdFicha f
              JOIN tcAnio a ON f.iIdAnio = a.iIdAnio
              JOIN tcSemana s ON f.iIdSemana = s.iIdSemana
            WHERE 
              f.iIdUniversidad = ?
-             AND f.iIdAnio IN (${aniosStr})
              AND s.iNumeroSemana <= ?
-           GROUP BY 
-             f.iIdAnio, f.iIdSemana
            ORDER BY 
              a.cAnio, s.iNumeroSemana`,
-          [universidadId, ...anios, semanas]
+          [universidadId, semanas]
         );
+        
+        console.log(`Encontrados ${rows.length} registros para ${nombreCorto}`);
+        
+        // Filtrar por los años solicitados (hacemos esto en memoria para depurar mejor)
+        const filteredRows = rows.filter(row => {
+          const anioNum = parseInt(row.anio);
+          return anios.includes(anioNum);
+        });
+        
+        console.log(`Después de filtrar por años (${anios.join(', ')}): ${filteredRows.length} registros`);
         
         // Procesar datos para esta universidad
         const universidadData = {
@@ -137,33 +147,75 @@ const fichaModel = {
         // Mapa para rastrear acumulados por año
         const acumuladosPorAnio = {};
         
-        // Inicializar acumulados
+        // Inicializar acumulados para todos los años solicitados
         anios.forEach(anio => {
           acumuladosPorAnio[anio] = 0;
         });
         
-        // Procesar filas de resultados
-        rows.forEach(row => {
+        // Procesar filas filtradas
+        filteredRows.forEach(row => {
           const anioNum = parseInt(row.anio);
+          const semanaNum = parseInt(row.semana);
+          const cantidad = parseInt(row.iCantidad);
           
-          // Datos regulares
+          // Verificar que todos los valores sean válidos
+          if (isNaN(anioNum) || isNaN(semanaNum) || isNaN(cantidad)) {
+            console.log(`Advertencia: Datos inválidos encontrados: ${JSON.stringify(row)}`);
+            return; // Saltar esta fila
+          }
+          
+          // Datos regulares - asegurarnos de que cada propiedad es del tipo correcto
           universidadData.regular.push({
-            semana: row.semana,
+            semana: semanaNum,
             anio: anioNum,
-            cantidad: row.cantidad
+            cantidad: cantidad
           });
           
           // Calcular acumulado
-          acumuladosPorAnio[anioNum] += row.cantidad;
+          acumuladosPorAnio[anioNum] += cantidad;
           
           // Datos acumulados
           universidadData.acumulado.push({
-            semana: row.semana,
+            semana: semanaNum,
             anio: anioNum,
-            cantidad: row.cantidad,
+            cantidad: cantidad,
             acumulado: acumuladosPorAnio[anioNum]
           });
         });
+        
+        // Si no hay datos, crear datos de ejemplo para las semanas solicitadas
+        if (universidadData.regular.length === 0) {
+          console.log(`No se encontraron datos para ${nombreCorto}, generando datos de ejemplo para pruebas`);
+          
+          anios.forEach(anio => {
+            acumuladosPorAnio[anio] = 0;
+            
+            for (let semana = 1; semana <= semanas; semana++) {
+              // Generar un valor aleatorio para pruebas
+              const cantidad = 0; // Para producción mejor poner 0 en lugar de un valor aleatorio
+              
+              // Datos regulares
+              universidadData.regular.push({
+                semana: semana,
+                anio: anio,
+                cantidad: cantidad
+              });
+              
+              // Calcular acumulado
+              acumuladosPorAnio[anio] += cantidad;
+              
+              // Datos acumulados
+              universidadData.acumulado.push({
+                semana: semana,
+                anio: anio,
+                cantidad: cantidad,
+                acumulado: acumuladosPorAnio[anio]
+              });
+            }
+          });
+        }
+        
+        console.log(`Datos procesados para ${nombreCorto}: ${universidadData.regular.length} registros regulares, ${universidadData.acumulado.length} acumulados`);
         
         // Guardar resultados de esta universidad
         resultados[nombreCorto] = universidadData;
@@ -171,6 +223,7 @@ const fichaModel = {
       
       return resultados;
     } catch (error) {
+      console.error('Error en getReporteTodasUniversidades:', error);
       throw error;
     }
   }
