@@ -90,7 +90,7 @@ app.get('/api/reportes/pdf', async (req, res) => {
     
     // Añadir el logo en la esquina superior derecha
     try {
-      const logoPath = path.join(__dirname, '../public/general/LOGO_pdf.png');
+      const logoPath = path.join(__dirname, '../frontend/public/img/general/LOGO_pdf.png');
       
       if (fs.existsSync(logoPath)) {
         console.log('Logo encontrado, añadiendo al PDF');
@@ -176,12 +176,12 @@ app.get('/api/reportes/pdf', async (req, res) => {
       //images logos
       // Mapa de rutas para las imágenes de universidades
       const universityImages = {
-        'UTSJR': path.join(__dirname, '../public/universidades/LOGO_UTSJR.png'),
-        'UTC': path.join(__dirname, '../public/universidades/LOGO_UTC.png'),
-        'UTEQ': path.join(__dirname, '../public/universidades/LOGO_UTEQ.png'),
-        'UNAQ': path.join(__dirname, '../public/universidades/LOGO_UNAQ.png'),
-        'UPQ': path.join(__dirname, '../public/universidades/LOGO_UPQ.png'),
-        'UPSRJ': path.join(__dirname, '../public/universidades/LOGO_UPSRJ.png')
+        'UTSJR': path.join(__dirname, '../frontend/public/img/universidades/LOGO_UTSJR.png'),
+        'UTC': path.join(__dirname, '../frontend/public/img/universidades/LOGO_UTC.png'),
+        'UTEQ': path.join(__dirname, '../frontend/public/img/universidades/LOGO_UTEQ.png'),
+        'UNAQ': path.join(__dirname, '../frontend/public/img/universidades/LOGO_UNAQ.png'),
+        'UPQ': path.join(__dirname, '../frontend/public/img/universidades/LOGO_UPQ.png'),
+        'UPSRJ': path.join(__dirname, '../frontend/public/img/universidades/LOGO_UPSRJ.png')
       };
       
       UNIVERSITIES.forEach(uni => {
@@ -512,7 +512,7 @@ app.use(cors());
 app.use(express.json());
 
 // Configurar servicio de archivos estáticos para imágenes
-app.use('/images', express.static(path.join(__dirname, '../public')));
+app.use('/images', express.static(path.join(__dirname, '../frontend/public/img')));
 
 // Ruta principal
 app.get('/', (req, res) => {
