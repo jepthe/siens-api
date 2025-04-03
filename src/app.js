@@ -513,7 +513,7 @@ app.use(cors());
 app.use(express.json());
 
 // Configurar servicio de archivos estáticos para imágenes
-app.use('/images', express.static(path.join(__dirname, '../frontend/public/img')));
+app.use('/img', express.static(path.join(__dirname, '../frontend/public/img')));
 
 // Ruta principal
 app.get('/', (req, res) => {
