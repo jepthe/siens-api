@@ -3,6 +3,22 @@ const db = require('../config/db');
 const bcrypt = require('bcryptjs');
 
 const userModel = {
+
+  findByUsername: async (username) => {
+    try {
+      const [rows] = await db.query(
+        `SELECT u.*, r.cNombreRol AS nombreRol 
+         FROM tdUsuario u
+         LEFT JOIN tcRol r ON u.iIdRol = r.iIdRol
+         WHERE u.cNombreUsuario = ?`,
+        [username]
+      );
+      return rows[0];
+    } catch (error) {
+      throw error;
+    }
+  },
+
   // Método para buscar usuario por nombre de usuario
   findByEmail: async (username) => {
     try {

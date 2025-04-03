@@ -9,11 +9,21 @@ require('dotenv').config();
 
 const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
-  // Usamos email como username porque así está en nuestro frontend por ahora
-  const username = email;
+  
+  // Vamos a buscar usuario por email o nombre de usuario
+  let user = null;
+  
+  // Primero buscamos por correo electrónico
+  let userByEmail = await userModel.findByEmail(email);
+  
+  if (!userByEmail) {
+    // Si no se encuentra por email, buscamos por nombre de usuario
+    user = await userModel.findByUsername(email);
+  } else {
+    user = userByEmail;
+  }
 
   // 1) Verificar si el usuario existe
-  const user = await userModel.findByEmail(username);
   if (!user) {
     return res.status(401).json({
       status: 'fail',

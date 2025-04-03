@@ -620,26 +620,42 @@ app.post('/api/auth/login', async (req, res) => {
     const { email, password } = req.body;
     console.log('Intento de login con:', { email });
     
-    // Buscar usuario por correo electrónico usando JOIN con tdDetallesUsuario
-    const [users] = await db.query(
+    let user = null;
+    
+    // Primero intentamos buscar por correo electrónico
+    const [usersByEmail] = await db.query(
       `SELECT u.*, d.cCorreo, d.cNombreCompleto 
        FROM tdUsuario u
-       INNER JOIN tdDetallesUsuario d ON u.iIdUsuario = d.iIdUsuario
+       LEFT JOIN tdDetallesUsuario d ON u.iIdUsuario = d.iIdUsuario
        WHERE d.cCorreo = ?`,
       [email]
     );
     
-    // Verificar si existe el usuario
-    if (users.length === 0) {
-      console.log('Usuario no encontrado');
-      return res.status(401).json({ 
-        message: 'Credenciales incorrectas' 
-      });
+    // Si no encontramos usuario por correo, intentamos por nombre de usuario
+    if (usersByEmail.length === 0) {
+      console.log('Usuario no encontrado por correo, buscando por nombre de usuario');
+      
+      const [usersByUsername] = await db.query(
+        `SELECT u.*, d.cCorreo, d.cNombreCompleto 
+         FROM tdUsuario u
+         LEFT JOIN tdDetallesUsuario d ON u.iIdUsuario = d.iIdUsuario
+         WHERE u.cNombreUsuario = ?`,
+        [email]
+      );
+      
+      if (usersByUsername.length === 0) {
+        console.log('Usuario no encontrado');
+        return res.status(401).json({ 
+          message: 'Credenciales incorrectas' 
+        });
+      }
+      
+      user = usersByUsername[0];
+    } else {
+      user = usersByEmail[0];
     }
     
-    const user = users[0];
-    
-    // Verificar la contraseña (aquí sin encriptación por simplicidad)
+    // Verificar la contraseña
     if (user.cContraseña !== password) {
       console.log('Contraseña incorrecta');
       return res.status(401).json({ 
@@ -671,29 +687,25 @@ app.post('/api/auth/login', async (req, res) => {
       }
     };
     
-    // If existe cImagen, añadirla al objeto de respuesta con la ruta completa
+    // Si existe cImagen, añadirla al objeto de respuesta con la ruta completa
     if (user.cImagen) {
       // Ensure we're using HTTPS for production
       const baseUrl = process.env.API_URL || 'https://siens-api-production.up.railway.app';
       
       // Properly format the image URL
-      // If it's already a full URL
       if (user.cImagen.startsWith('http://') || user.cImagen.startsWith('https://')) {
         // Force HTTPS for security
         safeResponse.user.cImagen = user.cImagen.replace(/^http:\/\//i, 'https://');
       } 
-      // If it starts with /images/ 
       else if (user.cImagen.startsWith('/img/')) {
         safeResponse.user.cImagen = `${baseUrl}${user.cImagen}`;
       }
-      // Otherwise it's just a filename
       else {
         safeResponse.user.cImagen = `${baseUrl}/img/${user.cImagen}`;
       }
       
       console.log('URL de imagen generada:', safeResponse.user.cImagen);
     }
-    
     
     res.status(200).json(safeResponse);
   } catch (error) {
