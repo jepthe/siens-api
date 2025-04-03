@@ -683,12 +683,12 @@ app.post('/api/auth/login', async (req, res) => {
         safeResponse.user.cImagen = user.cImagen.replace(/^http:\/\//i, 'https://');
       } 
       // If it starts with /images/ 
-      else if (user.cImagen.startsWith('/images/')) {
+      else if (user.cImagen.startsWith('/img/')) {
         safeResponse.user.cImagen = `${baseUrl}${user.cImagen}`;
       }
       // Otherwise it's just a filename
       else {
-        safeResponse.user.cImagen = `${baseUrl}/images/${user.cImagen}`;
+        safeResponse.user.cImagen = `${baseUrl}/img/${user.cImagen}`;
       }
       
       console.log('URL de imagen generada:', safeResponse.user.cImagen);
