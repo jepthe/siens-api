@@ -76,7 +76,7 @@ app.get('/api/reportes/pdf', async (req, res) => {
     
     // Crear el documento PDF
     const doc = new PDFDocument({ 
-      margin: 50,
+      margin: 40,
       size: 'A4',
       layout: 'landscape', // Para tablas más anchas
       bufferPages: true // Asegúrate de que esto esté habilitado
@@ -88,6 +88,41 @@ app.get('/api/reportes/pdf', async (req, res) => {
     // Pipe el documento al stream de archivo
     doc.pipe(stream);
     
+    // Añadir el logo en la esquina superior derecha
+    try {
+      const logoPath = path.join(__dirname, '../public/general/LOGO_pdf.png');
+      
+      if (fs.existsSync(logoPath)) {
+        console.log('Logo encontrado, añadiendo al PDF');
+        
+        // Guardar la posición actual
+        const currentY = doc.y;
+        
+        // Calcular las dimensiones adecuadas para el logo
+        const maxHeight = 60; // altura máxima del logo
+        const maxWidth = 120; // ancho máximo del logo
+        
+        // Añadir la imagen en la esquina superior derecha
+        doc.image(
+          logoPath,
+          50, // 50 es el margen izquierdo
+          50, // 50 es el margen superior
+          {
+            fit: [maxWidth, maxHeight],
+            align: 'left',
+            valign: 'top'
+          }
+        );
+        
+        // Restaurar la posición Y para continuar con el título
+        doc.y = currentY;
+      } else {
+        console.log('Logo no encontrado en la ruta:', logoPath);
+      }
+    } catch (logoError) {
+      console.error('Error al añadir el logo al PDF:', logoError);
+    }
+
     // Título del reporte
     doc.fontSize(24).text('Concentrado de Universidades', {
       align: 'center'
@@ -113,7 +148,7 @@ app.get('/api/reportes/pdf', async (req, res) => {
 
     // Información del documento
     doc.fontSize(6)
-      .text(`Fecha: ${formattedDate} | Hora: ${formattedTime} | Fuente: ${timeSource}`, { align: 'right' })
+      .text(`Fecha: ${formattedDate} | Hora: ${formattedTime}`, { align: 'right' })
       .text(`Generado por: ${nombreUsuario}`, { align: 'right' });
     
     doc.moveDown(2);
@@ -276,7 +311,7 @@ app.get('/api/reportes/pdf', async (req, res) => {
       
       // Verificar si necesitamos una nueva página
       if (currentY > doc.page.height - 100) {
-        doc.addPage();
+        //doc.addPage();
         currentY = drawTableHeader(); // Redibuja los encabezados en la nueva página
         console.log('Añadida nueva página, nueva posición Y:', currentY);
       }
@@ -330,7 +365,7 @@ app.get('/api/reportes/pdf', async (req, res) => {
     
     // Después de todas las filas de datos, verifica si necesitas una nueva página para los totales
     if (currentY > doc.page.height - 100) {
-      doc.addPage();
+      //doc.addPage();
       currentY = drawTableHeader(); // Redibuja los encabezados en la nueva página
       console.log('Añadida nueva página para totales, nueva posición Y:', currentY);
     }
