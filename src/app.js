@@ -175,6 +175,7 @@ app.get('/api/reportes/pdf', async (req, res) => {
       x += weekColWidth;
       //images logos
       // Mapa de rutas para las imágenes de universidades
+      //logos para el pdf
       const universityImages = {
         'UTSJR': path.join(__dirname, '../frontend/public/img/universidades/LOGO_UTSJR.png'),
         'UTC': path.join(__dirname, '../frontend/public/img/universidades/LOGO_UTC.png'),
