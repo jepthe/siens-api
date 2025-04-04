@@ -35,14 +35,12 @@ app.get('/api/reportes/pdf', async (req, res) => {
   const pdfPath = path.join(tmpDir, pdfFileName);
   
   try {
-    const { anios, semanas, usuario, fechaLocal, horaLocal } = req.query;
+    const { anios, semanas, usuario, timezone } = req.query;
     const nombreUsuario = usuario || 'Usuario'; // Valor por defecto
     
-    // Usar fecha y hora enviadas desde el cliente si están disponibles
-    const usingClientTime = !!(fechaLocal && horaLocal);
-    
     console.log('=== INICIANDO GENERACIÓN DE PDF ===');
-    console.log('Parámetros recibidos:', { anios, semanas, usuario, fechaLocal, horaLocal });
+    console.log('Parámetros recibidos:', { anios, semanas, usuario, timezone });
+    console.log('Zona horaria recibida del cliente:', timezone);
     
     // Convertir parámetros a formato adecuado
     const aniosArray = Array.isArray(anios) ? anios.map(Number) : [Number(anios)];
@@ -131,19 +129,41 @@ app.get('/api/reportes/pdf', async (req, res) => {
     doc.moveDown();
     
     // Usar fecha y hora del cliente o del servidor
-    let formattedDate, formattedTime, timeSource;
+    let formattedDate, formattedTime, clientTimeZone;
     
-    if (usingClientTime) {
-      // Usar los valores enviados desde el cliente
-      formattedDate = fechaLocal;
-      formattedTime = horaLocal;
-      timeSource = 'Cliente';
-    } else {
-      // Usar la fecha y hora del servidor
-      const serverDate = new Date();
-      formattedDate = `${String(serverDate.getDate()).padStart(2, '0')}/${String(serverDate.getMonth() + 1).padStart(2, '0')}/${serverDate.getFullYear()}`;
-      formattedTime = `${String(serverDate.getHours()).padStart(2, '0')}:${String(serverDate.getMinutes()).padStart(2, '0')}:${String(serverDate.getSeconds()).padStart(2, '0')}`;
-      timeSource = 'Servidor';
+    try {
+      // Si hay una zona horaria del cliente, usarla
+      if (timezone) {
+        const clientDate = new Date();
+        // Ajustar manualmente la fecha según el offset de zona horaria
+        const clientOffset = parseFloat(timezone) || 0;
+        const serverOffset = clientDate.getTimezoneOffset() * -1 / 60; // Convertir de minutos a horas
+        const offsetDiff = clientOffset - serverOffset;
+        
+        // Ajustar la fecha según la diferencia de offset
+        clientDate.setHours(clientDate.getHours() + offsetDiff);
+        
+        // Formato: DD/MM/YYYY
+        formattedDate = `${String(clientDate.getDate()).padStart(2, '0')}/${String(clientDate.getMonth() + 1).padStart(2, '0')}/${clientDate.getFullYear()}`;
+        
+        // Formato: HH:MM:SS
+        formattedTime = `${String(clientDate.getHours()).padStart(2, '0')}:${String(clientDate.getMinutes()).padStart(2, '0')}:${String(clientDate.getSeconds()).padStart(2, '0')}`;
+        
+        clientTimeZone = `GMT${timezone >= 0 ? '+' : ''}${timezone}`;
+      } else {
+        // Si no hay zona horaria del cliente, usar la hora del servidor
+        const serverDate = new Date();
+        formattedDate = `${String(serverDate.getDate()).padStart(2, '0')}/${String(serverDate.getMonth() + 1).padStart(2, '0')}/${serverDate.getFullYear()}`;
+        formattedTime = `${String(serverDate.getHours()).padStart(2, '0')}:${String(serverDate.getMinutes()).padStart(2, '0')}:${String(serverDate.getSeconds()).padStart(2, '0')}`;
+        clientTimeZone = 'Servidor';
+      }
+    } catch (timeError) {
+      console.error('Error al procesar zona horaria:', timeError);
+      // En caso de error, usar la hora del servidor
+      const fallbackDate = new Date();
+      formattedDate = `${String(fallbackDate.getDate()).padStart(2, '0')}/${String(fallbackDate.getMonth() + 1).padStart(2, '0')}/${fallbackDate.getFullYear()}`;
+      formattedTime = `${String(fallbackDate.getHours()).padStart(2, '0')}:${String(fallbackDate.getMinutes()).padStart(2, '0')}:${String(fallbackDate.getSeconds()).padStart(2, '0')}`;
+      clientTimeZone = 'Servidor (fallback)';
     }
 
     // Información del documento
