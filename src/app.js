@@ -211,7 +211,7 @@ app.get('/api/reportes/pdf', async (req, res) => {
     const rowColors = ['#ffffff', '#f9f9f9'];
     
     // Para cada semana, crear una fila
-    semanas.forEach((semana, index) => {
+    semanasArray.forEach((semana, index) => {
       const rowColor = rowColors[index % 2];
       
       // Si necesitamos una nueva página
