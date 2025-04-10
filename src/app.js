@@ -126,13 +126,13 @@ app.get('/api/reportes/pdf', async (req, res) => {
     // Información del documento
     doc.fontSize(10)
       .text(`Fecha: ${formattedDate} | Hora: ${formattedTime}`, { align: 'right' })
-      .text(`Generado por: ${nombreUsuario}`, { align: 'right' });
+      .text(`Generado por: ${nombreUsuario} | Página 1 de 1`, { align: 'right' });
+    // Nota: el "1 de 1" se corregirá más adelante en el código
     
     doc.moveDown(2);
     
     // *** MEJORA: Crear tabla optimizada en una sola página ***
     
-    // Determinar todas las semanas disponibles hasta el límite seleccionado
     // Determinar todas las semanas disponibles hasta el límite seleccionado
     const semanasArray = Array.from({ length: semanasNum }, (_, i) => i + 1);
     
@@ -289,8 +289,8 @@ app.get('/api/reportes/pdf', async (req, res) => {
               item => item.semana === semana && item.anio === year
             );
             
-            if (regularData && regularData.cantidad) {
-              value = regularData.cantidad;
+            if (regularData) {
+              value = regularData.cantidad || 0; // Asegurar que el valor sea un número
             }
           }
           
@@ -328,18 +328,32 @@ app.get('/api/reportes/pdf', async (req, res) => {
       aniosArray.forEach(year => {
         doc.rect(xPos, yPos, dataColWidth, 40).stroke();
         
-        // Calcular total para esta universidad y año
+        // Calcular total para esta universidad y año - lógica mejorada
         let columnTotal = 0;
+        let found = false;
         
-        if (uniData && uniData.acumulado) {
+        if (uniData && uniData.acumulado && uniData.acumulado.length > 0) {
           // Buscar el último acumulado para este año
           const acumulados = uniData.acumulado
             .filter(item => item.anio === year && item.semana <= semanasNum)
             .sort((a, b) => b.semana - a.semana);
           
-          if (acumulados.length > 0 && acumulados[0].acumulado) {
-            columnTotal = acumulados[0].acumulado;
+          if (acumulados.length > 0) {
+            columnTotal = acumulados[0].acumulado || 0;
+            found = true;
           }
+        }
+
+        // Si no se encontró en acumulado, calcularlo manualmente
+        if (!found && uniData && uniData.regular) {
+          columnTotal = uniData.regular
+            .filter(item => item.anio === year && item.semana <= semanasNum)
+            .reduce((sum, item) => sum + (item.cantidad || 0), 0);
+        }
+        
+        // Imprimir en la consola para depuración (solo la primera universidad)
+        if (uniIndex === 0) {
+          console.log(`Total para ${uni}, año ${year}: ${columnTotal}`);
         }
         
         // Mostrar total
@@ -385,7 +399,18 @@ app.get('/api/reportes/pdf', async (req, res) => {
     const totalPages = doc.bufferedPageRange().count;
     for (let i = 0; i < totalPages; i++) {
       doc.switchToPage(i);
-      doc.fontSize(8).text(`Página ${i + 1} de ${totalPages}`, 40, doc.page.height - 40, { align: 'center' });
+      // Eliminar el texto del pie de página
+      // Y en su lugar, actualizar el número de página en el encabezado
+      const headerText = `Generado por: ${nombreUsuario} | Página ${i + 1} de ${totalPages}`;
+      
+      // Calcular la posición y - necesitas encontrar la posición exacta según tu layout
+      const headerY = 100; // Ajusta este valor según la posición real en tu documento
+      
+      // Limpiar el área donde estaba el texto anterior
+      doc.fillColor('#FFFFFF').rect(doc.page.width - 250, headerY, 200, 20).fill();
+      
+      // Escribir el nuevo texto con número de página
+      doc.fillColor('#000000').text(headerText, doc.page.width - 250, headerY, { align: 'right', width: 200 });
     }
     
     // Finalizar el documento
