@@ -1,0 +1,44 @@
+.
+├── frontend
+│   └── public
+│       └── img
+│           ├── general
+│           │   ├── Jacinto.jpg
+│           │   ├── LOGO_pdf.png
+│           │   └── Norma.jpg
+│           └── universidades
+│               ├── LOGO_UNAQ.png
+│               ├── LOGO_UPQ.png
+│               ├── LOGO_UPSRJ.png
+│               ├── LOGO_UTC.png
+│               ├── LOGO_UTEQ.png
+│               └── LOGO_UTSJR.png
+├── node_modules
+├── package-lock.json
+├── package.json
+├── src
+│   ├── app.js
+│   ├── config
+│   │   ├── db.js
+│   │   └── jwt.js
+│   ├── controllers
+│   │   ├── authController.js
+│   │   ├── reporteController.js
+│   │   └── universidadController.js
+│   ├── middlewares
+│   │   ├── auth.js
+│   │   └── error.js
+│   ├── models
+│   │   ├── fichaModel.js
+│   │   ├── universidadModel.js
+│   │   └── userModel.js
+│   ├── routes
+│   │   ├── authRoutes.js
+│   │   ├── reporteRoutes.js
+│   │   └── universidadRoutes.js
+│   ├── server.js
+│   └── utils
+│       └── asyncHandler.js
+└── tmp
+
+475 directories, 2639 files

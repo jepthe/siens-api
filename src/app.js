@@ -74,7 +74,7 @@ app.get('/api/reportes/pdf', async (req, res) => {
     
     // Crear el documento PDF
     const doc = new PDFDocument({ 
-      margin: 40,
+      margin: 50,
       size: 'A4',
       layout: 'landscape', // Para tablas más anchas
       bufferPages: true // Asegúrate de que esto esté habilitado
