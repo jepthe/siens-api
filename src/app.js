@@ -30,6 +30,7 @@ app.use('/tmp', express.static(path.join(__dirname, '../tmp')));
 // Endpoint para generar PDF
 // Solución completa para el endpoint de generación de PDF
 
+// En app.js - Modificar la función de generación de PDF
 app.get('/api/reportes/pdf', async (req, res) => {
   const pdfFileName = `reporte_${Date.now()}.pdf`;
   const pdfPath = path.join(tmpDir, pdfFileName);
@@ -40,7 +41,6 @@ app.get('/api/reportes/pdf', async (req, res) => {
     
     console.log('=== INICIANDO GENERACIÓN DE PDF ===');
     console.log('Parámetros recibidos:', { anios, semanas, usuario, timezone });
-    console.log('Zona horaria recibida del cliente:', timezone);
     
     // Convertir parámetros a formato adecuado
     const aniosArray = Array.isArray(anios) ? anios.map(Number) : [Number(anios)];
@@ -50,34 +50,20 @@ app.get('/api/reportes/pdf', async (req, res) => {
     let reporteData = {};
     try {
       reporteData = await fichaModel.getReporteTodasUniversidades(aniosArray, semanasNum);
-      console.log('Datos obtenidos para las universidades:', Object.keys(reporteData));
-      console.log('Estructura de datos de ejemplo:');
-      if (Object.keys(reporteData).length > 0) {
-        const primerUniversidad = Object.keys(reporteData)[0];
-        console.log(`Ejemplo de datos para ${primerUniversidad}:`, {
-          tieneRegular: !!reporteData[primerUniversidad].regular,
-          tieneAcumulado: !!reporteData[primerUniversidad].acumulado,
-          cantidadDatosRegular: reporteData[primerUniversidad].regular?.length || 0,
-          cantidadDatosAcumulado: reporteData[primerUniversidad].acumulado?.length || 0,
-          ejemploRegular: reporteData[primerUniversidad].regular?.[0] || 'No hay datos',
-          ejemploAcumulado: reporteData[primerUniversidad].acumulado?.[0] || 'No hay datos'
-        });
-      }
     } catch (dataError) {
       console.error('Error al obtener datos para el PDF:', dataError);
-      reporteData = { UTSJR: { regular: [], acumulado: [] } };
+      reporteData = {};
     }
     
     // Obtener la lista de universidades
     const UNIVERSITIES = Object.keys(reporteData);
-    console.log('Universidades en los datos:', UNIVERSITIES);
     
     // Crear el documento PDF
     const doc = new PDFDocument({ 
-      margin: 50,
+      margin: 40,
       size: 'A4',
       layout: 'landscape', // Para tablas más anchas
-      bufferPages: true // Asegúrate de que esto esté habilitado
+      bufferPages: true 
     });
     
     // Crear un stream para guardar el archivo
@@ -86,36 +72,45 @@ app.get('/api/reportes/pdf', async (req, res) => {
     // Pipe el documento al stream de archivo
     doc.pipe(stream);
     
-    // Añadir el logo en la esquina superior derecha
+    // Formato de fecha/hora
+    let formattedDate, formattedTime;
+    try {
+      if (timezone) {
+        const clientDate = new Date();
+        const clientOffset = parseFloat(timezone) || 0;
+        const serverOffset = clientDate.getTimezoneOffset() * -1 / 60;
+        const offsetDiff = clientOffset - serverOffset;
+        
+        clientDate.setHours(clientDate.getHours() + offsetDiff);
+        
+        formattedDate = `${String(clientDate.getDate()).padStart(2, '0')}/${String(clientDate.getMonth() + 1).padStart(2, '0')}/${clientDate.getFullYear()}`;
+        formattedTime = `${String(clientDate.getHours()).padStart(2, '0')}:${String(clientDate.getMinutes()).padStart(2, '0')}:${String(clientDate.getSeconds()).padStart(2, '0')}`;
+      } else {
+        const serverDate = new Date();
+        formattedDate = `${String(serverDate.getDate()).padStart(2, '0')}/${String(serverDate.getMonth() + 1).padStart(2, '0')}/${serverDate.getFullYear()}`;
+        formattedTime = `${String(serverDate.getHours()).padStart(2, '0')}:${String(serverDate.getMinutes()).padStart(2, '0')}:${String(serverDate.getSeconds()).padStart(2, '0')}`;
+      }
+    } catch (timeError) {
+      const fallbackDate = new Date();
+      formattedDate = `${String(fallbackDate.getDate()).padStart(2, '0')}/${String(fallbackDate.getMonth() + 1).padStart(2, '0')}/${fallbackDate.getFullYear()}`;
+      formattedTime = `${String(fallbackDate.getHours()).padStart(2, '0')}:${String(fallbackDate.getMinutes()).padStart(2, '0')}:${String(fallbackDate.getSeconds()).padStart(2, '0')}`;
+    }
+
+    // Añadir el logo en la esquina superior izquierda (solo primera página)
     try {
       const logoPath = path.join(__dirname, '../frontend/public/img/general/LOGO_pdf.png');
       
       if (fs.existsSync(logoPath)) {
-        console.log('Logo encontrado, añadiendo al PDF');
-        
-        // Guardar la posición actual
-        const currentY = doc.y;
-        
-        // Calcular las dimensiones adecuadas para el logo
-        const maxHeight = 60; // altura máxima del logo
-        const maxWidth = 120; // ancho máximo del logo
-        
-        // Añadir la imagen en la esquina superior derecha
         doc.image(
           logoPath,
-          50, // 50 es el margen izquierdo
-          50, // 50 es el margen superior
+          50, // margen izquierdo
+          50, // margen superior
           {
-            fit: [maxWidth, maxHeight],
+            fit: [100, 50],
             align: 'left',
             valign: 'top'
           }
         );
-        
-        // Restaurar la posición Y para continuar con el título
-        doc.y = currentY;
-      } else {
-        console.log('Logo no encontrado en la ruta:', logoPath);
       }
     } catch (logoError) {
       console.error('Error al añadir el logo al PDF:', logoError);
@@ -128,361 +123,269 @@ app.get('/api/reportes/pdf', async (req, res) => {
     
     doc.moveDown();
     
-    // Usar fecha y hora del cliente o del servidor
-    let formattedDate, formattedTime, clientTimeZone;
-    
-    try {
-      // Si hay una zona horaria del cliente, usarla
-      if (timezone) {
-        const clientDate = new Date();
-        // Ajustar manualmente la fecha según el offset de zona horaria
-        const clientOffset = parseFloat(timezone) || 0;
-        const serverOffset = clientDate.getTimezoneOffset() * -1 / 60; // Convertir de minutos a horas
-        const offsetDiff = clientOffset - serverOffset;
-        
-        // Ajustar la fecha según la diferencia de offset
-        clientDate.setHours(clientDate.getHours() + offsetDiff);
-        
-        // Formato: DD/MM/YYYY
-        formattedDate = `${String(clientDate.getDate()).padStart(2, '0')}/${String(clientDate.getMonth() + 1).padStart(2, '0')}/${clientDate.getFullYear()}`;
-        
-        // Formato: HH:MM:SS
-        formattedTime = `${String(clientDate.getHours()).padStart(2, '0')}:${String(clientDate.getMinutes()).padStart(2, '0')}:${String(clientDate.getSeconds()).padStart(2, '0')}`;
-        
-        clientTimeZone = `GMT${timezone >= 0 ? '+' : ''}${timezone}`;
-      } else {
-        // Si no hay zona horaria del cliente, usar la hora del servidor
-        const serverDate = new Date();
-        formattedDate = `${String(serverDate.getDate()).padStart(2, '0')}/${String(serverDate.getMonth() + 1).padStart(2, '0')}/${serverDate.getFullYear()}`;
-        formattedTime = `${String(serverDate.getHours()).padStart(2, '0')}:${String(serverDate.getMinutes()).padStart(2, '0')}:${String(serverDate.getSeconds()).padStart(2, '0')}`;
-        clientTimeZone = 'Servidor';
-      }
-    } catch (timeError) {
-      console.error('Error al procesar zona horaria:', timeError);
-      // En caso de error, usar la hora del servidor
-      const fallbackDate = new Date();
-      formattedDate = `${String(fallbackDate.getDate()).padStart(2, '0')}/${String(fallbackDate.getMonth() + 1).padStart(2, '0')}/${fallbackDate.getFullYear()}`;
-      formattedTime = `${String(fallbackDate.getHours()).padStart(2, '0')}:${String(fallbackDate.getMinutes()).padStart(2, '0')}:${String(fallbackDate.getSeconds()).padStart(2, '0')}`;
-      clientTimeZone = 'Servidor (fallback)';
-    }
-
     // Información del documento
-    doc.fontSize(6)
+    doc.fontSize(10)
       .text(`Fecha: ${formattedDate} | Hora: ${formattedTime}`, { align: 'right' })
       .text(`Generado por: ${nombreUsuario}`, { align: 'right' });
     
     doc.moveDown(2);
     
-    // Dibujar tabla combinada
-    const tableTop = doc.y;
-    const tableWidth = doc.page.width - 100; // Ancho total de la tabla
+    // *** MEJORA: Crear tabla optimizada en una sola página ***
     
-    // Calcular el ancho para cada columna
-    const cellsCount = 1 + (UNIVERSITIES.length * aniosArray.length);
-    const baseColWidth = tableWidth / cellsCount;
-    const weekColWidth = baseColWidth;
-    const dataColWidth = baseColWidth;
+    // Determinar todas las semanas disponibles hasta el límite seleccionado
+    // Determinar todas las semanas disponibles hasta el límite seleccionado
+    const semanasArray = Array.from({ length: semanasNum }, (_, i) => i + 1);
     
-    // Función para crear el encabezado de la tabla
-    function drawTableHeader() {
-      const startY = doc.y;
+    // Calcular ancho de las columnas
+    const pageWidth = doc.page.width - 80; // 40px de margen en cada lado
+    const firstColWidth = 80; // Ancho de la primera columna (semanas)
+    const totalColWidth = 80; // Ancho de la columna de totales
+    const dataColWidth = (pageWidth - firstColWidth - totalColWidth) / (UNIVERSITIES.length * aniosArray.length);
+    
+    // Posición vertical actual
+    let yPos = doc.y;
+    
+    // Dibujar encabezado de la tabla
+    doc.rect(40, yPos, pageWidth, 60).fillAndStroke('#f5f5f5', '#cccccc'); // Fondo gris claro
+    
+    // Primera fila: Nombre de universidades
+    let xPos = 40 + firstColWidth;
+    doc.fontSize(10).fillColor('#000000');
+    doc.text('Semana', 50, yPos + 15, { width: firstColWidth - 20, align: 'center' });
+    
+    // Mapeo de nombres de univerisdades a sus logos
+    const universityImages = {
+      'UPQ': path.join(__dirname, '../frontend/public/img/universidades/LOGO_UPQ.png'),
+      'UPSRJ': path.join(__dirname, '../frontend/public/img/universidades/LOGO_UPSRJ.png'),
+      'UTEQ': path.join(__dirname, '../frontend/public/img/universidades/LOGO_UTEQ.png'),
+      'UTC': path.join(__dirname, '../frontend/public/img/universidades/LOGO_UTC.png'),
+      'UTSJR': path.join(__dirname, '../frontend/public/img/universidades/LOGO_UTSJR.png'),
+      'UNAQ': path.join(__dirname, '../frontend/public/img/universidades/LOGO_UNAQ.png')
+    };
+    
+    // Dibujar logos de universidades
+    UNIVERSITIES.forEach(uni => {
+      doc.rect(xPos, yPos, dataColWidth * aniosArray.length, 30).stroke();
       
-      // Primer nivel de encabezado (universidades)
-      let x = 50;
-      doc.fillColor('#FFFFFF').rect(x, startY, weekColWidth, 30).fill();
-      doc.fillColor('black').fontSize(10).text('Semana', x + 5, startY + 10, { width: weekColWidth - 10, align: 'center' });
-      
-      x += weekColWidth;
-      //images logos
-      // Mapa de rutas para las imágenes de universidades
-      //logos para el pdf
-      const universityImages = {
-        'UTSJR': path.join(__dirname, '../frontend/public/img/universidades/LOGO_UTSJR.png'),
-        'UTC': path.join(__dirname, '../frontend/public/img/universidades/LOGO_UTC.png'),
-        'UTEQ': path.join(__dirname, '../frontend/public/img/universidades/LOGO_UTEQ.png'),
-        'UNAQ': path.join(__dirname, '../frontend/public/img/universidades/LOGO_UNAQ.png'),
-        'UPQ': path.join(__dirname, '../frontend/public/img/universidades/LOGO_UPQ.png'),
-        'UPSRJ': path.join(__dirname, '../frontend/public/img/universidades/LOGO_UPSRJ.png')
-      };
-      
-      UNIVERSITIES.forEach(uni => {
-        const uniColWidth = dataColWidth * aniosArray.length;
-        // Dibuja un fondo para el encabezado
-        doc.fillColor('#FFFFFF').rect(x, startY, uniColWidth, 30).fill();
-        
-        // Intenta cargar y añadir la imagen
-        try {
-          if (universityImages[uni] && fs.existsSync(universityImages[uni])) {
-            // Calcula dimensiones para la imagen (mantener proporción y ajustar al espacio)
-            const maxHeight = 25; // altura máxima de la imagen
-            const maxWidth = uniColWidth - 10; // ancho máximo con margen
-            
-            // Dibuja la imagen en el centro del encabezado
-            doc.image(
-              universityImages[uni], 
-              x + (uniColWidth - maxWidth)/2, // centrar horizontalmente
-              startY + 2.5, // pequeño margen superior
-              { 
-                fit: [maxWidth, maxHeight],
-                align: 'center',
-                valign: 'center'
-              }
-            );
-          } else {
-            // Si no existe la imagen, mostrar el nombre como respaldo
-            doc.fillColor('black').fontSize(9).text(
-              uni, 
-              x + 5, 
-              startY + 10, 
-              { width: uniColWidth - 10, align: 'center' }
-            );
-          }
-        } catch (imgError) {
-          console.error(`Error al cargar imagen para ${uni}:`, imgError);
-          // Si hay error, mostrar el nombre
-          doc.fillColor('black').fontSize(9).text(
-            uni, 
-            x + 5, 
-            startY + 10, 
-            { width: uniColWidth - 10, align: 'center' }
+      try {
+        if (universityImages[uni] && fs.existsSync(universityImages[uni])) {
+          doc.image(
+            universityImages[uni],
+            xPos + 10,
+            yPos + 5,
+            { fit: [dataColWidth * aniosArray.length - 20, 20], align: 'center' }
           );
+        } else {
+          doc.text(uni, xPos + 5, yPos + 10, { width: dataColWidth * aniosArray.length - 10, align: 'center' });
         }
-        
-        x += uniColWidth;
-      });
-      
-      // Segundo nivel de encabezado (años)
-      x = 50 + weekColWidth; // Comenzamos después de la columna de semana
-      const yearHeaderY = startY + 30;
-      
-      UNIVERSITIES.forEach(uni => {
-        aniosArray.forEach(year => {
-          doc.fillColor('#f2f2f2').rect(x, yearHeaderY, dataColWidth, 25).fill();
-          doc.fillColor('black').fontSize(9).text(year.toString(), x + 5, yearHeaderY + 8, { width: dataColWidth - 10, align: 'center' });
-          x += dataColWidth;
-        });
-      });
-      
-      return yearHeaderY + 25; // Devolvemos la posición Y después de los encabezados
-    }
-    
-    // Dibujar los encabezados de la tabla
-    let currentY = drawTableHeader();
-    
-    // Preparar los datos para combinar en filas
-    // Encontrar todas las semanas únicas - con manejo más detallado
-    const allSemanas = new Set();
-
-    // Primero, comprueba si hay datos para depuración
-    let hayDatosParaAlgunaUniversidad = false;
-
-    Object.entries(reporteData).forEach(([universidad, datos]) => {
-      console.log(`Procesando datos para ${universidad}:`);
-      
-      if (!datos) {
-        console.log(`- No hay datos para ${universidad}`);
-        return;
+      } catch (err) {
+        doc.text(uni, xPos + 5, yPos + 10, { width: dataColWidth * aniosArray.length - 10, align: 'center' });
       }
       
-      // Verificar si hay datos regulares
-      if (!datos.regular || !Array.isArray(datos.regular) || datos.regular.length === 0) {
-        console.log(`- No hay datos regulares para ${universidad}`);
-      } else {
-        console.log(`- Hay ${datos.regular.length} registros regulares para ${universidad}`);
-        hayDatosParaAlgunaUniversidad = true;
-        
-        // Extraer semanas de datos regulares
-        datos.regular.forEach(item => {
-          if (item && typeof item.semana === 'number' && item.semana <= semanasNum) {
-            allSemanas.add(item.semana);
-            console.log(`  - Añadida semana ${item.semana} de datos regulares`);
-          } else if (item) {
-            console.log(`  - Dato regular inválido: ${JSON.stringify(item)}`);
-          }
-        });
-      }
+      xPos += dataColWidth * aniosArray.length;
     });
-
-    // Si no hay semanas detectadas, crear semanas manualmente
-    if (allSemanas.size === 0) {
-      console.log('No se detectaron semanas en los datos. Creando semanas manualmente...');
-      
-      if (hayDatosParaAlgunaUniversidad) {
-        console.log('Hay datos pero no se detectaron semanas correctamente. Posible problema de estructura.');
-      } else {
-        console.log('No hay datos para ninguna universidad. Creando semanas de respaldo.');
-      }
-      
-      // Crear semanas manualmente del 1 al número de semanas solicitado
-      for (let i = 1; i <= semanasNum; i++) {
-        allSemanas.add(i);
-        console.log(`Añadida semana ${i} manualmente`);
-      }
-    }
     
-    // Convertir a array y ordenar
-    const uniqueSemanas = Array.from(allSemanas).sort((a, b) => a - b);
-    console.log('Semanas únicas detectadas finalmente:', uniqueSemanas);
-    console.log('Total de semanas a dibujar:', uniqueSemanas.length);
-
-    // 3. En la parte donde se dibujan las filas de datos, asegúrate de manejar datos vacíos
-    uniqueSemanas.forEach((semana, index) => {
-      // Log por cada semana para ser más exhaustivos en la depuración
-      console.log(`Dibujando semana ${semana} (fila ${index + 1} de ${uniqueSemanas.length})`);
+    // Columna de TOTAL
+    doc.rect(xPos, yPos, totalColWidth, 30).stroke();
+    doc.text('TOTAL', xPos + 5, yPos + 10, { width: totalColWidth - 10, align: 'center', continued: false });
+    
+    // Segunda fila: Años bajo universidades
+    yPos += 30;
+    xPos = 40 + firstColWidth;
+    
+    UNIVERSITIES.forEach(uni => {
+      aniosArray.forEach(year => {
+        doc.rect(xPos, yPos, dataColWidth, 30).stroke();
+        doc.text(year.toString(), xPos + 5, yPos + 10, { width: dataColWidth - 10, align: 'center' });
+        xPos += dataColWidth;
+      });
+    });
+    
+    // Columna de totales
+    doc.rect(xPos, yPos, totalColWidth, 30).stroke();
+    
+    // Filas de datos
+    yPos += 30;
+    
+    // Colores para filas alternadas
+    const rowColors = ['#ffffff', '#f9f9f9'];
+    
+    // Para cada semana, crear una fila
+    semanas.forEach((semana, index) => {
+      const rowColor = rowColors[index % 2];
       
-      // Verificar si necesitamos una nueva página
-      if (currentY > doc.page.height - 100) {
-        //doc.addPage();
-        currentY = drawTableHeader(); // Redibuja los encabezados en la nueva página
-        console.log('Añadida nueva página, nueva posición Y:', currentY);
+      // Si necesitamos una nueva página
+      if (yPos > doc.page.height - 100) {
+        doc.addPage();
+        yPos = 60; // Reiniciar posición Y
+        
+        // Repetir encabezados en la nueva página
+        doc.fontSize(14).text('Concentrado de Universidades (continuación)', {
+          align: 'center'
+        });
+        doc.moveDown();
+        
+        // Dibujar el encabezado de nuevo
+        doc.rect(40, yPos, pageWidth, 60).fillAndStroke('#f5f5f5', '#cccccc');
+        
+        // Primera fila: Nombre de universidades
+        let xHeader = 40 + firstColWidth;
+        doc.fontSize(10).fillColor('#000000');
+        doc.text('Semana', 50, yPos + 15, { width: firstColWidth - 20, align: 'center' });
+        
+        // Dibujar logos de universidades
+        UNIVERSITIES.forEach(uni => {
+          doc.rect(xHeader, yPos, dataColWidth * aniosArray.length, 30).stroke();
+          doc.text(uni, xHeader + 5, yPos + 10, { width: dataColWidth * aniosArray.length - 10, align: 'center' });
+          xHeader += dataColWidth * aniosArray.length;
+        });
+        
+        // Columna de TOTAL
+        doc.rect(xHeader, yPos, totalColWidth, 30).stroke();
+        doc.text('TOTAL', xHeader + 5, yPos + 10, { width: totalColWidth - 10, align: 'center' });
+        
+        // Segunda fila: Años bajo universidades
+        yPos += 30;
+        xHeader = 40 + firstColWidth;
+        
+        UNIVERSITIES.forEach(uni => {
+          aniosArray.forEach(year => {
+            doc.rect(xHeader, yPos, dataColWidth, 30).stroke();
+            doc.text(year.toString(), xHeader + 5, yPos + 10, { width: dataColWidth - 10, align: 'center' });
+            xHeader += dataColWidth;
+          });
+        });
+        
+        // Columna de totales
+        doc.rect(xHeader, yPos, totalColWidth, 30).stroke();
+        
+        yPos += 30;
       }
       
-      const rowY = currentY;
-      let x = 50;
+      // Fondo para la fila
+      doc.rect(40, yPos, pageWidth, 30).fill(rowColor);
       
-      // Alternar colores de fondo
-      const bgColor = index % 2 === 0 ? '#ffffff' : '#f9f9f9';
-      doc.fillColor(bgColor).rect(x, rowY, tableWidth, 20).fill();
+      // Celda de semana
+      doc.rect(40, yPos, firstColWidth, 30).stroke();
+      doc.fillColor('#000000').text(`S${semana}`, 50, yPos + 10, { width: firstColWidth - 20, align: 'center' });
       
-      // Columna de semana
-      doc.fillColor('black').fontSize(9).text(`S${semana}`, x + 5, rowY + 5, { width: weekColWidth - 10, align: 'center' });
-      x += weekColWidth;
+      // Inicializar total de fila
+      let rowTotal = 0;
       
-      // Datos para cada universidad y año
+      // Celdas de datos
+      xPos = 40 + firstColWidth;
+      
       UNIVERSITIES.forEach(uni => {
         const uniData = reporteData[uni];
         
         aniosArray.forEach(year => {
-          // Buscar datos para esta semana y año (con más logs)
-          let value = 0;
-          let dataFound = false;
+          doc.rect(xPos, yPos, dataColWidth, 30).stroke();
           
-          if (uniData && uniData.regular && Array.isArray(uniData.regular)) {
-            const data = uniData.regular.find(item => 
-              item && item.semana === semana && item.anio === year
+          // Buscar valor para esta universidad, año y semana
+          let value = 0;
+          
+          if (uniData && uniData.regular) {
+            const regularData = uniData.regular.find(
+              item => item.semana === semana && item.anio === year
             );
             
-            if (data) {
-              value = data.cantidad || 0;
-              dataFound = true;
+            if (regularData && regularData.cantidad) {
+              value = regularData.cantidad;
             }
           }
           
-          // Si es la primera universidad o la última semana, log para depuración
-          if (uni === UNIVERSITIES[0] || index === uniqueSemanas.length - 1) {
-            console.log(`  - Valor para ${uni}, año ${year}, semana ${semana}: ${value} (${dataFound ? 'encontrado' : 'no encontrado'})`);
-          }
+          // Mostrar valor
+          doc.text(value.toString(), xPos + 5, yPos + 10, { width: dataColWidth - 10, align: 'center' });
           
-          doc.fillColor('black').fontSize(9).text(value.toString(), x + 5, rowY + 5, { width: dataColWidth - 10, align: 'center' });
-          x += dataColWidth;
+          // Sumar al total de la fila
+          rowTotal += value;
+          
+          xPos += dataColWidth;
         });
       });
       
-      currentY += 20; // Incrementar la posición Y para la siguiente fila
+      // Celda de total de fila
+      doc.rect(xPos, yPos, totalColWidth, 30).fillAndStroke('#e6f7ff', '#cccccc');
+      doc.text(rowTotal.toString(), xPos + 5, yPos + 10, { width: totalColWidth - 10, align: 'center' });
       
-      // Asegurarse de dibujar las líneas horizontales para cada fila
-      doc.moveTo(50, currentY).lineTo(50 + tableWidth, currentY).stroke();
+      yPos += 30;
     });
     
-    // Después de todas las filas de datos, verifica si necesitas una nueva página para los totales
-    if (currentY > doc.page.height - 100) {
-      //doc.addPage();
-      currentY = drawTableHeader(); // Redibuja los encabezados en la nueva página
-      console.log('Añadida nueva página para totales, nueva posición Y:', currentY);
-    }
+    // Fila de totales
+    doc.rect(40, yPos, pageWidth, 40).fillAndStroke('#e6f7ff', '#000000');
+    doc.rect(40, yPos, firstColWidth, 40).stroke();
+    doc.fontSize(12).text('Totales', 50, yPos + 15, { width: firstColWidth - 20, align: 'center' });
     
-    // Dibujar fila de totales
-    const totalsRowY = currentY;
-    let x = 50;
+    // Inicializar total general
+    let grandTotal = 0;
     
-    // Fondo destacado para totales
-    doc.fillColor('#e6f7ff').rect(x, totalsRowY, tableWidth, 25).fill();
+    // Celdas de totales por columna
+    xPos = 40 + firstColWidth;
     
-    // Etiqueta de totales
-    doc.fillColor('black').fontSize(10).font('Helvetica-Bold').text('Totales', x + 5, totalsRowY + 7, { width: weekColWidth - 10, align: 'center' });
-    x += weekColWidth;
-    
-    // Totales para cada universidad y año
     UNIVERSITIES.forEach(uni => {
       const uniData = reporteData[uni];
       
       aniosArray.forEach(year => {
-        // Buscar el último dato acumulado para este año
-        let total = 0;
+        doc.rect(xPos, yPos, dataColWidth, 40).stroke();
+        
+        // Calcular total para esta universidad y año
+        let columnTotal = 0;
+        
         if (uniData && uniData.acumulado) {
+          // Buscar el último acumulado para este año
           const acumulados = uniData.acumulado
-            .filter(item => item && item.anio === year && item.semana <= semanasNum)
+            .filter(item => item.anio === year && item.semana <= semanasNum)
             .sort((a, b) => b.semana - a.semana);
           
-          if (acumulados.length > 0) {
-            total = acumulados[0].acumulado || 0;
+          if (acumulados.length > 0 && acumulados[0].acumulado) {
+            columnTotal = acumulados[0].acumulado;
           }
         }
         
-        doc.fillColor('black').fontSize(10).font('Helvetica-Bold').text(total.toString(), x + 5, totalsRowY + 7, { width: dataColWidth - 10, align: 'center' });
+        // Mostrar total
+        doc.fontSize(10).text(columnTotal.toString(), xPos + 5, yPos + 10, { width: dataColWidth - 10, align: 'center' });
         
-        // Si hay más de un año, mostrar la diferencia
+        // Calcular diferencia si hay más de un año
         if (aniosArray.length > 1 && year === aniosArray[aniosArray.length - 1] && aniosArray.includes(year - 1)) {
-          // Calcular diferencia con el año anterior
-          let prevTotal = 0;
+          // Buscar valor del año anterior
+          let prevColumnTotal = 0;
+          
           if (uniData && uniData.acumulado) {
             const prevAcumulados = uniData.acumulado
-              .filter(item => item && item.anio === (year - 1) && item.semana <= semanasNum)
+              .filter(item => item.anio === (year - 1) && item.semana <= semanasNum)
               .sort((a, b) => b.semana - a.semana);
             
-            if (prevAcumulados.length > 0) {
-              prevTotal = prevAcumulados[0].acumulado || 0;
+            if (prevAcumulados.length > 0 && prevAcumulados[0].acumulado) {
+              prevColumnTotal = prevAcumulados[0].acumulado;
             }
           }
           
-          const diff = total - prevTotal;
+          // Calcular diferencia
+          const diff = columnTotal - prevColumnTotal;
           const diffText = `(${diff > 0 ? '+' : ''}${diff})`;
-          const diffColor = diff > 0 ? 'green' : 'red';
           
-          doc.fillColor(diffColor).fontSize(8).text(diffText, x + 5, totalsRowY + 18, { width: dataColWidth - 10, align: 'center' });
+          // Mostrar diferencia
+          doc.fontSize(8)
+            .fillColor(diff >= 0 ? 'green' : 'red')
+            .text(diffText, xPos + 5, yPos + 25, { width: dataColWidth - 10, align: 'center' });
         }
         
-        x += dataColWidth;
+        // Sumar al total general
+        grandTotal += columnTotal;
+        
+        xPos += dataColWidth;
       });
     });
     
-    // Dibujar bordes de la tabla
-    doc.rect(50, tableTop, tableWidth, (totalsRowY + 25) - tableTop).stroke();
-    
-    // Líneas verticales
-    x = 50 + weekColWidth;
-    doc.moveTo(x, tableTop).lineTo(x, totalsRowY + 25).stroke();
-    
-    UNIVERSITIES.forEach(uni => {
-      x += dataColWidth * aniosArray.length;
-      doc.moveTo(x, tableTop).lineTo(x, totalsRowY + 25).stroke();
-    });
-    
-    // Líneas horizontales después de los encabezados
-    doc.moveTo(50, tableTop + 30).lineTo(50 + tableWidth, tableTop + 30).stroke();
-    doc.moveTo(50, tableTop + 55).lineTo(50 + tableWidth, tableTop + 55).stroke();
-    
-    // Línea antes de los totales
-    doc.moveTo(50, totalsRowY).lineTo(50 + tableWidth, totalsRowY).stroke();
-    
-    // Líneas verticales para las columnas de año
-    x = 50 + weekColWidth;
-    UNIVERSITIES.forEach(uni => {
-      for (let i = 0; i < aniosArray.length; i++) {
-        doc.moveTo(x, tableTop + 30).lineTo(x, totalsRowY + 25).stroke();
-        x += dataColWidth;
-      }
-    });
-    
-    console.log('=== FINALIZANDO PDF ===');
-    console.log('Posición Y final:', totalsRowY + 25);
-    console.log('Altura de página:', doc.page.height);
+    // Celda de total general
+    doc.rect(xPos, yPos, totalColWidth, 40).fillAndStroke('#e6f7ff', '#000000');
+    doc.fontSize(12).fillColor('#000000').text(grandTotal.toString(), xPos + 5, yPos + 15, { width: totalColWidth - 10, align: 'center' });
     
     // Numerar páginas
     const totalPages = doc.bufferedPageRange().count;
     for (let i = 0; i < totalPages; i++) {
       doc.switchToPage(i);
-      doc.fontSize(6).text(`Página ${i + 1} de ${totalPages}`, 50, doc.page.height - 50, { align: 'center' });
+      doc.fontSize(8).text(`Página ${i + 1} de ${totalPages}`, 40, doc.page.height - 40, { align: 'center' });
     }
     
     // Finalizar el documento
@@ -491,12 +394,11 @@ app.get('/api/reportes/pdf', async (req, res) => {
     // Esperar a que se complete la escritura del documento
     stream.on('finish', () => {
       console.log(`PDF generado correctamente: ${pdfPath}`);
-      console.log(`Tamaño del archivo PDF: ${fs.statSync(pdfPath).size} bytes`);
       
-      // En lugar de devolver una URL:
+      // Leer el PDF generado
       const pdfContent = fs.readFileSync(pdfPath);
       
-      // Eliminar el archivo temporal inmediatamente después de leerlo
+      // Eliminar el archivo temporal
       fs.unlinkSync(pdfPath);
       
       // Configurar encabezados para descarga
