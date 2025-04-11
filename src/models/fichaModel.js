@@ -102,63 +102,74 @@ const fichaModel = {
         const universidadId = universidad.iIdUniversidad;
         const nombreCorto = universidad.cNombreCorto;
         
-        // Para cada año solicitado, consultar los datos
+        console.log(`Procesando universidad: ${nombreCorto} (ID: ${universidadId})`);
+        
+        // Consulta OPTIMIZADA para obtener la suma total de inscripciones por semana y año
+        const aniosStr = anios.map(() => '?').join(',');
+        
+        // Esta consulta suma TODAS las inscripciones para cada combinación de semana y año
+        const [sumaPorSemana] = await db.query(
+          `SELECT 
+             a.cAnio as anio,
+             s.iNumeroSemana as semana,
+             SUM(f.iCantidad) as total_cantidad
+           FROM 
+             tdFicha f
+             JOIN tcSemana s ON f.iIdSemana = s.iIdSemana
+             JOIN tcAnio a ON s.iIdAnio = a.iIdAnio
+           WHERE 
+             f.iIdUniversidad = ?
+             AND a.cAnio IN (${aniosStr})
+             AND s.iNumeroSemana <= ?
+           GROUP BY 
+             a.cAnio, s.iNumeroSemana
+           ORDER BY 
+             a.cAnio, s.iNumeroSemana`,
+          [universidadId, ...anios, semanas]
+        );
+        
+        console.log(`Encontrados ${sumaPorSemana.length} registros sumados para ${nombreCorto}`);
+        
+        // Estructura para organizar los datos
         const datosUniversidad = {
           regular: [],
           acumulado: []
         };
         
+        // Procesar los resultados para cada año y semana
         for (const anio of anios) {
-          // Consulta para obtener datos por semana
-          const [filas] = await db.query(
-            `SELECT 
-               s.iNumeroSemana as semana,
-               SUM(f.iCantidad) as cantidad
-             FROM 
-               tdFicha f
-               JOIN tcSemana s ON f.iIdSemana = s.iIdSemana
-               JOIN tcAnio a ON s.iIdAnio = a.iIdAnio
-             WHERE 
-               f.iIdUniversidad = ?
-               AND a.cAnio = ?
-               AND s.iNumeroSemana <= ?
-             GROUP BY 
-               s.iNumeroSemana
-             ORDER BY 
-               s.iNumeroSemana`,
-            [universidadId, anio, semanas]
-          );
-          
-          // Procesar resultados para formato consistente
-          for (let i = 1; i <= semanas; i++) {
-            // Buscar si existe dato para esta semana
-            const datoSemana = filas.find(fila => fila.semana === i);
-            
-            // Dato regular - con cantidad 0 si no hay datos
-            datosUniversidad.regular.push({
-              semana: i,
-              anio: parseInt(anio),
-              cantidad: datoSemana ? parseInt(datoSemana.cantidad) : 0
-            });
-          }
-          
-          // Calcular acumulados manualmente
           let acumulado = 0;
-          for (let i = 0; i < datosUniversidad.regular.length; i++) {
-            const dato = datosUniversidad.regular[i];
-            if (dato.anio === parseInt(anio)) {
-              acumulado += dato.cantidad;
-              datosUniversidad.acumulado.push({
-                semana: dato.semana,
-                anio: dato.anio,
-                cantidad: dato.cantidad,
-                acumulado: acumulado
-              });
-            }
+          
+          for (let numSemana = 1; numSemana <= semanas; numSemana++) {
+            // Buscar si hay datos para esta semana y año
+            const datoSemana = sumaPorSemana.find(
+              row => parseInt(row.anio) === parseInt(anio) && row.semana === numSemana
+            );
+            
+            // Cantidad para esta semana (o 0 si no hay datos)
+            const cantidad = datoSemana ? parseInt(datoSemana.total_cantidad) : 0;
+            
+            // Añadir a datos regulares
+            datosUniversidad.regular.push({
+              semana: numSemana,
+              anio: parseInt(anio),
+              cantidad: cantidad
+            });
+            
+            // Actualizar acumulado
+            acumulado += cantidad;
+            
+            // Añadir a datos acumulados
+            datosUniversidad.acumulado.push({
+              semana: numSemana,
+              anio: parseInt(anio),
+              cantidad: cantidad,
+              acumulado: acumulado
+            });
           }
         }
         
-        // Agregar al resultado
+        // Almacenar los datos de esta universidad
         resultados[nombreCorto] = datosUniversidad;
       }
       
