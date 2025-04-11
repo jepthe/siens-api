@@ -87,126 +87,107 @@ const fichaModel = {
     }
   },
   
-  getReporteTodasUniversidades: async (anios, semanas) => {
-    try {
-      // Obtener todas las universidades activas
-      const [universidades] = await db.query(
-        'SELECT iIdUniversidad, cNombreCorto FROM tcUniversidad WHERE bActivo = 1'
+  // En fichaModel.js
+getReporteTodasUniversidades: async (anios, semanas) => {
+  try {
+    // Obtener todas las universidades activas
+    const [universidades] = await db.query(
+      'SELECT iIdUniversidad, cNombreCorto FROM tcUniversidad WHERE bActivo = 1'
+    );
+    
+    const resultados = {};
+    
+    for (const universidad of universidades) {
+      const universidadId = universidad.iIdUniversidad;
+      const nombreCorto = universidad.cNombreCorto;
+      
+      console.log(`Procesando universidad: ${nombreCorto} (ID: ${universidadId})`);
+      
+      const datosUniversidad = {
+        regular: [],
+        acumulado: []
+      };
+      
+      // Primero obtenemos todas las sumas de una sola vez con una consulta eficiente
+      const aniosNumericos = anios.map(a => parseInt(a, 10));
+      
+      // Esta consulta suma todos los iCantidad para cada combinación única de año y semana
+      const query = `
+        SELECT 
+          a.cAnio as anio,
+          s.iNumeroSemana as semana,
+          SUM(f.iCantidad) as suma_cantidad
+        FROM 
+          tdFicha f
+          JOIN tcSemana s ON f.iIdSemana = s.iIdSemana
+          JOIN tcAnio a ON s.iIdAnio = a.iIdAnio
+        WHERE 
+          f.iIdUniversidad = ?
+          AND a.cAnio IN (${anios.map(() => '?').join(',')})
+          AND s.iNumeroSemana <= ?
+        GROUP BY 
+          a.cAnio, s.iNumeroSemana
+        ORDER BY 
+          a.cAnio, s.iNumeroSemana
+      `;
+      
+      const [sumasPorSemana] = await db.query(
+        query, 
+        [universidadId, ...aniosNumericos, semanas]
       );
       
-      const resultados = {};
+      console.log(`Se encontraron ${sumasPorSemana.length} sumatorias para universidad ${nombreCorto}`);
+      console.log(sumasPorSemana); // Muestra las sumas para depuración
       
-      for (const universidad of universidades) {
-        const universidadId = universidad.iIdUniversidad;
-        const nombreCorto = universidad.cNombreCorto;
+      // Para cada año solicitado
+      for (const anio of aniosNumericos) {
+        // Inicializar acumulado por año
+        let acumulado = 0;
         
-        console.log(`Procesando universidad: ${nombreCorto} (ID: ${universidadId})`);
-        
-        const datosUniversidad = {
-          regular: [],
-          acumulado: []
-        };
-        
-        // Para cada año solicitado
-        for (const anio of anios) {
-          console.log(`Procesando año: ${anio}`);
-          
-          // Primero, obtener los iIdSemana correspondientes a las semanas de este año
-          const [idsSemanas] = await db.query(
-            `SELECT iIdSemana, iNumeroSemana 
-             FROM tcSemana 
-             WHERE iIdAnio = (SELECT iIdAnio FROM tcAnio WHERE cAnio = ?) 
-               AND iNumeroSemana <= ?
-             ORDER BY iNumeroSemana`,
-            [anio, semanas]
+        // Para cada semana del 1 al máximo seleccionado
+        for (let numSemana = 1; numSemana <= semanas; numSemana++) {
+          // Buscar la suma para esta universidad, año y número de semana
+          const sumaPorSemana = sumasPorSemana.find(
+            row => parseInt(row.anio, 10) === anio && row.semana === numSemana
           );
           
-          console.log(`Encontrados ${idsSemanas.length} IDs de semanas para el año ${anio}`);
+          // Cantidad sumada para esta semana (o 0 si no hay datos)
+          const cantidad = sumaPorSemana && sumaPorSemana.suma_cantidad 
+            ? parseInt(sumaPorSemana.suma_cantidad, 10) 
+            : 0;
           
-          if (idsSemanas.length === 0) {
-            console.log(`No se encontraron semanas para el año ${anio}`);
-            // Generar semanas vacías
-            for (let s = 1; s <= semanas; s++) {
-              datosUniversidad.regular.push({
-                semana: s,
-                anio: parseInt(anio),
-                cantidad: 0
-              });
-            }
-            continue;
-          }
+          console.log(`[${nombreCorto}] Año ${anio}, Semana ${numSemana}: Cantidad ${cantidad}`);
           
-          // Para cada semana del 1 al máximo seleccionado
-          let acumulado = 0;
-          for (let numSemana = 1; numSemana <= semanas; numSemana++) {
-            // Buscar el ID de semana correspondiente
-            const semaInfo = idsSemanas.find(s => s.iNumeroSemana === numSemana);
-            
-            if (!semaInfo) {
-              console.log(`No se encontró iIdSemana para semana ${numSemana} año ${anio}`);
-              // Si no hay ID para esta semana, añadir con cantidad 0
-              datosUniversidad.regular.push({
-                semana: numSemana,
-                anio: parseInt(anio),
-                cantidad: 0
-              });
-              
-              datosUniversidad.acumulado.push({
-                semana: numSemana,
-                anio: parseInt(anio),
-                cantidad: 0,
-                acumulado: acumulado
-              });
-              
-              continue;
-            }
-            
-            // Obtener la suma de inscripciones para esta universidad, semana y año
-            const [sumaInscripciones] = await db.query(
-              `SELECT SUM(iCantidad) AS total
-               FROM tdFicha
-               WHERE iIdUniversidad = ?
-                 AND iIdSemana = ?`,
-              [universidadId, semaInfo.iIdSemana]
-            );
-            
-            // Cantidad para esta semana (o 0 si no hay datos)
-            const cantidad = sumaInscripciones[0] && sumaInscripciones[0].total 
-              ? parseInt(sumaInscripciones[0].total) 
-              : 0;
-            
-            console.log(`Universidad ${nombreCorto}, Año ${anio}, Semana ${numSemana}, iIdSemana ${semaInfo.iIdSemana}, Cantidad: ${cantidad}`);
-            
-            // Añadir a datos regulares
-            datosUniversidad.regular.push({
-              semana: numSemana,
-              anio: parseInt(anio),
-              cantidad: cantidad
-            });
-            
-            // Actualizar acumulado
-            acumulado += cantidad;
-            
-            // Añadir a datos acumulados
-            datosUniversidad.acumulado.push({
-              semana: numSemana,
-              anio: parseInt(anio),
-              cantidad: cantidad,
-              acumulado: acumulado
-            });
-          }
+          // Añadir a datos regulares
+          datosUniversidad.regular.push({
+            semana: numSemana,
+            anio: anio,
+            cantidad: cantidad
+          });
+          
+          // Actualizar acumulado
+          acumulado += cantidad;
+          
+          // Añadir a datos acumulados
+          datosUniversidad.acumulado.push({
+            semana: numSemana,
+            anio: anio,
+            cantidad: cantidad,
+            acumulado: acumulado
+          });
         }
-        
-        // Almacenar los datos de esta universidad
-        resultados[nombreCorto] = datosUniversidad;
       }
       
-      return resultados;
-    } catch (error) {
-      console.error('Error en getReporteTodasUniversidades:', error);
-      throw error;
+      // Almacenar los datos de esta universidad
+      resultados[nombreCorto] = datosUniversidad;
     }
+    
+    return resultados;
+  } catch (error) {
+    console.error('Error en getReporteTodasUniversidades:', error);
+    throw error;
   }
+}
 };
 
 module.exports = fichaModel;
