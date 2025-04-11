@@ -346,8 +346,8 @@ app.get('/api/reportes/pdf', async (req, res) => {
         
         // Mostrar total
         doc.fontSize(10)
-          .fillColor(diff >= 0 ? 'green' : 'red')
-          .text(columnTotal.toString(), xPos + 5, yPos + 10, { width: dataColWidth - 10, align: 'center' });
+        .fillColor('green')
+        .text(columnTotal.toString(), xPos + 5, yPos + 10, { width: dataColWidth - 10, align: 'center' });
         
         // Calcular diferencia si hay más de un año
         if (aniosArray.length > 1 && year === aniosArray[aniosArray.length - 1] && aniosArray.includes(year - 1)) {
