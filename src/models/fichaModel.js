@@ -94,60 +94,88 @@ const fichaModel = {
         'SELECT iIdUniversidad, cNombreCorto FROM tcUniversidad WHERE bActivo = 1'
       );
       
-      // Objeto para almacenar resultados por universidad
       const resultados = {};
       
-      // Para cada universidad, obtener sus datos
       for (const universidad of universidades) {
         const universidadId = universidad.iIdUniversidad;
         const nombreCorto = universidad.cNombreCorto;
         
         console.log(`Procesando universidad: ${nombreCorto} (ID: ${universidadId})`);
         
-        // Consulta OPTIMIZADA para obtener la suma total de inscripciones por semana y año
-        const aniosStr = anios.map(() => '?').join(',');
-        
-        // Esta consulta suma TODAS las inscripciones para cada combinación de semana y año
-        const [sumaPorSemana] = await db.query(
-          `SELECT 
-             a.cAnio as anio,
-             s.iNumeroSemana as semana,
-             SUM(f.iCantidad) as total_cantidad
-           FROM 
-             tdFicha f
-             JOIN tcSemana s ON f.iIdSemana = s.iIdSemana
-             JOIN tcAnio a ON s.iIdAnio = a.iIdAnio
-           WHERE 
-             f.iIdUniversidad = ?
-             AND a.cAnio IN (${aniosStr})
-             AND s.iNumeroSemana <= ?
-           GROUP BY 
-             a.cAnio, s.iNumeroSemana
-           ORDER BY 
-             a.cAnio, s.iNumeroSemana`,
-          [universidadId, ...anios, semanas]
-        );
-        
-        console.log(`Encontrados ${sumaPorSemana.length} registros sumados para ${nombreCorto}`);
-        
-        // Estructura para organizar los datos
         const datosUniversidad = {
           regular: [],
           acumulado: []
         };
         
-        // Procesar los resultados para cada año y semana
+        // Para cada año solicitado
         for (const anio of anios) {
-          let acumulado = 0;
+          console.log(`Procesando año: ${anio}`);
           
+          // Primero, obtener los iIdSemana correspondientes a las semanas de este año
+          const [idsSemanas] = await db.query(
+            `SELECT iIdSemana, iNumeroSemana 
+             FROM tcSemana 
+             WHERE iIdAnio = (SELECT iIdAnio FROM tcAnio WHERE cAnio = ?) 
+               AND iNumeroSemana <= ?
+             ORDER BY iNumeroSemana`,
+            [anio, semanas]
+          );
+          
+          console.log(`Encontrados ${idsSemanas.length} IDs de semanas para el año ${anio}`);
+          
+          if (idsSemanas.length === 0) {
+            console.log(`No se encontraron semanas para el año ${anio}`);
+            // Generar semanas vacías
+            for (let s = 1; s <= semanas; s++) {
+              datosUniversidad.regular.push({
+                semana: s,
+                anio: parseInt(anio),
+                cantidad: 0
+              });
+            }
+            continue;
+          }
+          
+          // Para cada semana del 1 al máximo seleccionado
+          let acumulado = 0;
           for (let numSemana = 1; numSemana <= semanas; numSemana++) {
-            // Buscar si hay datos para esta semana y año
-            const datoSemana = sumaPorSemana.find(
-              row => parseInt(row.anio) === parseInt(anio) && row.semana === numSemana
+            // Buscar el ID de semana correspondiente
+            const semaInfo = idsSemanas.find(s => s.iNumeroSemana === numSemana);
+            
+            if (!semaInfo) {
+              console.log(`No se encontró iIdSemana para semana ${numSemana} año ${anio}`);
+              // Si no hay ID para esta semana, añadir con cantidad 0
+              datosUniversidad.regular.push({
+                semana: numSemana,
+                anio: parseInt(anio),
+                cantidad: 0
+              });
+              
+              datosUniversidad.acumulado.push({
+                semana: numSemana,
+                anio: parseInt(anio),
+                cantidad: 0,
+                acumulado: acumulado
+              });
+              
+              continue;
+            }
+            
+            // Obtener la suma de inscripciones para esta universidad, semana y año
+            const [sumaInscripciones] = await db.query(
+              `SELECT SUM(iCantidad) AS total
+               FROM tdFicha
+               WHERE iIdUniversidad = ?
+                 AND iIdSemana = ?`,
+              [universidadId, semaInfo.iIdSemana]
             );
             
             // Cantidad para esta semana (o 0 si no hay datos)
-            const cantidad = datoSemana ? parseInt(datoSemana.total_cantidad) : 0;
+            const cantidad = sumaInscripciones[0] && sumaInscripciones[0].total 
+              ? parseInt(sumaInscripciones[0].total) 
+              : 0;
+            
+            console.log(`Universidad ${nombreCorto}, Año ${anio}, Semana ${numSemana}, iIdSemana ${semaInfo.iIdSemana}, Cantidad: ${cantidad}`);
             
             // Añadir a datos regulares
             datosUniversidad.regular.push({
