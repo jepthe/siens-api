@@ -418,7 +418,7 @@ app.get('/api/reportes/pdf', async (req, res) => {
       // Dibujar encabezados de semanas
       semanasArray.forEach(semana => {
         doc.rect(xPos, yPos, dataColWidth * aniosArray.length, 30).stroke();
-        doc.text(`Semana ${semana}`, xPos + 5, yPos + 10, { 
+        doc.text(`S${semana}`, xPos + 5, yPos + 10, { 
           width: dataColWidth * aniosArray.length - 10, 
           align: 'center' 
         });
