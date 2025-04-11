@@ -436,7 +436,25 @@ app.get('/api/reportes/pdf', async (req, res) => {
       semanasArray.forEach(semana => {
         aniosArray.forEach(year => {
           doc.rect(xPos, yPos, dataColWidth, 30).stroke();
-          doc.text(year.toString(), xPos + 5, yPos + 10, { width: dataColWidth - 10, align: 'center' });
+          
+          // Guardar el estado actual
+          doc.save();
+          
+          // Mover el punto de origen al centro vertical y ligeramente a la derecha del borde izquierdo de la celda
+          doc.translate(xPos + 10, yPos + 15);
+          
+          // Rotar 90 grados en sentido anti-horario
+          doc.rotate(-90);
+          
+          // Dibujar el texto centrado respecto al nuevo origen
+          doc.fillColor('#000000').text(year.toString(), 0, 0, { 
+            width: 25, // Altura original de la celda, ahora es el ancho del texto rotado
+            align: 'center'
+          });
+          
+          // Restaurar el estado original
+          doc.restore();
+          
           xPos += dataColWidth;
         });
       });
@@ -494,7 +512,25 @@ app.get('/api/reportes/pdf', async (req, res) => {
           semanasArray.forEach(semana => {
             aniosArray.forEach(year => {
               doc.rect(xHeader, yPos, dataColWidth, 30).stroke();
-              doc.text(year.toString(), xHeader + 5, yPos + 10, { width: dataColWidth - 10, align: 'center' });
+              
+              // Guardar el estado actual
+              doc.save();
+              
+              // Mover el punto de origen al centro vertical y ligeramente a la derecha del borde izquierdo de la celda
+              doc.translate(xHeader + 10, yPos + 15);
+              
+              // Rotar 90 grados en sentido anti-horario
+              doc.rotate(-90);
+              
+              // Dibujar el texto centrado respecto al nuevo origen
+              doc.fillColor('#000000').text(year.toString(), 0, 0, { 
+                width: 25, // Altura original de la celda, ahora es el ancho del texto rotado
+                align: 'center'
+              });
+              
+              // Restaurar el estado original
+              doc.restore();
+              
               xHeader += dataColWidth;
             });
           });
