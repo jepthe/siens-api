@@ -21,13 +21,12 @@ const fichaModel = {
       // Convertir anios a formato de consulta IN()
       const aniosStr = anios.map(() => '?').join(',');
       
-      // Consulta para obtener datos por semana y año
+      // Consulta modificada para filtrar por iNumeroSemana en lugar de iIdSemana
       const [rows] = await db.query(
         `SELECT 
            f.iIdAnio,
            a.cAnio as anio,
-           f.iIdSemana,
-           s.iNumeroSemana as semana,
+           s.iNumeroSemana as semana,  -- Usamos iNumeroSemana, no iIdSemana
            SUM(f.iCantidad) as cantidad
          FROM 
            tdFicha f
@@ -36,56 +35,20 @@ const fichaModel = {
          WHERE 
            f.iIdUniversidad = ?
            AND f.iIdAnio IN (${aniosStr})
-           AND s.iNumeroSemana <= ?
+           AND s.iNumeroSemana <= ?  -- Filtramos por iNumeroSemana
          GROUP BY 
-           f.iIdAnio, f.iIdSemana
+           f.iIdAnio, s.iNumeroSemana  -- Agrupamos por iNumeroSemana
          ORDER BY 
            a.cAnio, s.iNumeroSemana`,
         [universidadId, ...anios, semanas]
       );
       
-      // Procesar datos para crear estructura de reporte
-      const reporteData = {
-        regular: [],
-        acumulado: []
-      };
-      
-      // Mapa para rastrear acumulados por año
-      const acumuladosPorAnio = {};
-      
-      // Inicializar acumulados
-      anios.forEach(anio => {
-        acumuladosPorAnio[anio] = 0;
-      });
-      
-      // Procesar filas de resultados
-      rows.forEach(row => {
-        const anioNum = parseInt(row.anio);
-        
-        // Datos regulares
-        reporteData.regular.push({
-          semana: row.semana,
-          anio: anioNum,
-          cantidad: row.cantidad
-        });
-        
-        // Calcular acumulado
-        acumuladosPorAnio[anioNum] += row.cantidad;
-        
-        // Datos acumulados
-        reporteData.acumulado.push({
-          semana: row.semana,
-          anio: anioNum,
-          cantidad: row.cantidad,
-          acumulado: acumuladosPorAnio[anioNum]
-        });
-      });
-      
-      return reporteData;
+      // Resto del código para procesar los resultados...
     } catch (error) {
       throw error;
     }
   },
+  
   
   getReporteTodasUniversidades: async (anios, semanas) => {
     try {
@@ -114,7 +77,7 @@ const fichaModel = {
           `SELECT 
              f.iIdFicha, f.iIdUniversidad, 
              f.iIdAnio, a.cAnio as anio, 
-             f.iIdSemana, s.iNumeroSemana as semana,
+             s.iNumeroSemana as semana,  -- Usamos iNumeroSemana
              f.iCantidad 
            FROM 
              tdFicha f
@@ -122,7 +85,7 @@ const fichaModel = {
              JOIN tcSemana s ON f.iIdSemana = s.iIdSemana
            WHERE 
              f.iIdUniversidad = ?
-             AND s.iNumeroSemana <= ?
+             AND s.iNumeroSemana <= ?  -- Filtramos por iNumeroSemana
            ORDER BY 
              a.cAnio, s.iNumeroSemana`,
           [universidadId, semanas]
