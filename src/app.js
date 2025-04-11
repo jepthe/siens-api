@@ -314,6 +314,7 @@ app.get('/api/reportes/pdf', async (req, res) => {
     
     // Fila de totales
     doc.rect(40, yPos, pageWidth, 40).fillAndStroke('#e6f7ff', '#000000');
+    doc.fillColor('#000000'); 
     doc.rect(40, yPos, firstColWidth, 40).stroke();
     doc.fontSize(12).text('Totales', 50, yPos + 15, { width: firstColWidth - 20, align: 'center' });
     
