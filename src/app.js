@@ -306,6 +306,7 @@ app.get('/api/reportes/pdf', async (req, res) => {
       
       // Celda de total de fila
       doc.rect(xPos, yPos, totalColWidth, 30).fillAndStroke('#e6f7ff', '#cccccc');
+      doc.fillColor('#000000'); // Establecer explícitamente el color del texto a negro
       doc.text(rowTotal.toString(), xPos + 5, yPos + 10, { width: totalColWidth - 10, align: 'center' });
       
       yPos += 30;
