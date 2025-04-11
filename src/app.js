@@ -441,14 +441,15 @@ app.get('/api/reportes/pdf', async (req, res) => {
           doc.save();
           
           // Mover el punto de origen al centro vertical y ligeramente a la derecha del borde izquierdo de la celda
-          doc.translate(xPos + 10, yPos + 15);
+          // Posicionar en la parte inferior de la celda
+          doc.translate(xPos + (dataColWidth / 2), yPos + 25);
           
           // Rotar 90 grados en sentido anti-horario
           doc.rotate(-90);
           
           // Dibujar el texto centrado respecto al nuevo origen
-          doc.fillColor('#000000').text(year.toString(), 0, 0, { 
-            width: 25, // Altura original de la celda, ahora es el ancho del texto rotado
+          // Dibujar el texto alineado al final
+          doc.fillColor('#000000').fontSize(8).text(year.toString(), -15, -4, { 
             align: 'center'
           });
           
@@ -517,14 +518,15 @@ app.get('/api/reportes/pdf', async (req, res) => {
               doc.save();
               
               // Mover el punto de origen al centro vertical y ligeramente a la derecha del borde izquierdo de la celda
-              doc.translate(xHeader + 10, yPos + 15);
+              // Posicionar en la parte inferior de la celda
+              doc.translate(xPos + (dataColWidth / 2), yPos + 25);
               
               // Rotar 90 grados en sentido anti-horario
               doc.rotate(-90);
               
               // Dibujar el texto centrado respecto al nuevo origen
-              doc.fillColor('#000000').text(year.toString(), 0, 0, { 
-                width: 25, // Altura original de la celda, ahora es el ancho del texto rotado
+              // Dibujar el texto alineado al final
+              doc.fillColor('#000000').fontSize(8).text(year.toString(), -15, -4, { 
                 align: 'center'
               });
               
