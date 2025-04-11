@@ -346,7 +346,7 @@ app.get('/api/reportes/pdf', async (req, res) => {
         
         // Mostrar total
         doc.fontSize(10)
-        .fillColor('green')
+        .fillColor('#000000')
         .text(columnTotal.toString(), xPos + 5, yPos + 10, { width: dataColWidth - 10, align: 'center' });
         
         // Calcular diferencia si hay más de un año
