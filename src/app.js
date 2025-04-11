@@ -36,11 +36,12 @@ app.get('/api/reportes/pdf', async (req, res) => {
   const pdfPath = path.join(tmpDir, pdfFileName);
   
   try {
-    const { anios, semanas, usuario, timezone } = req.query;
+    const { anios, semanas, usuario, timezone, viewType } = req.query;
     const nombreUsuario = usuario || 'Usuario'; // Valor por defecto
+    const formatoVista = viewType || 'bySemana'; // Por defecto usa el formato por semana
     
     console.log('=== INICIANDO GENERACIÓN DE PDF ===');
-    console.log('Parámetros recibidos:', { anios, semanas, usuario, timezone });
+    console.log('Parámetros recibidos:', { anios, semanas, usuario, timezone, viewType });
     
     // Convertir parámetros a formato adecuado
     const aniosArray = Array.isArray(anios) ? anios.map(Number) : [Number(anios)];
@@ -130,30 +131,7 @@ app.get('/api/reportes/pdf', async (req, res) => {
     
     doc.moveDown(2);
     
-    // *** MEJORA: Crear tabla optimizada en una sola página ***
-    
-    // Determinar todas las semanas disponibles hasta el límite seleccionado
-    // Determinar todas las semanas disponibles hasta el límite seleccionado
-    const semanasArray = Array.from({ length: semanasNum }, (_, i) => i + 1);
-    
-    // Calcular ancho de las columnas
-    const pageWidth = doc.page.width - 80; // 40px de margen en cada lado
-    const firstColWidth = 80; // Ancho de la primera columna (semanas)
-    const totalColWidth = 80; // Ancho de la columna de totales
-    const dataColWidth = (pageWidth - firstColWidth - totalColWidth) / (UNIVERSITIES.length * aniosArray.length);
-    
-    // Posición vertical actual
-    let yPos = doc.y;
-    
-    // Dibujar encabezado de la tabla
-    doc.rect(40, yPos, pageWidth, 60).fillAndStroke('#f5f5f5', '#cccccc'); // Fondo gris claro
-    
-    // Primera fila: Nombre de universidades
-    let xPos = 40 + firstColWidth;
-    doc.fontSize(10).fillColor('#000000');
-    doc.text('Semana', 50, yPos + 15, { width: firstColWidth - 20, align: 'center' });
-    
-    // Mapeo de nombres de univerisdades a sus logos
+    // Mapeo de nombres de universidades a sus logos
     const universityImages = {
       'UPQ': path.join(__dirname, '../frontend/public/img/universidades/LOGO_UPQ.png'),
       'UPSRJ': path.join(__dirname, '../frontend/public/img/universidades/LOGO_UPSRJ.png'),
@@ -163,233 +141,470 @@ app.get('/api/reportes/pdf', async (req, res) => {
       'UNAQ': path.join(__dirname, '../frontend/public/img/universidades/LOGO_UNAQ.png')
     };
     
-    // Dibujar logos de universidades
-    UNIVERSITIES.forEach(uni => {
-      doc.rect(xPos, yPos, dataColWidth * aniosArray.length, 30).stroke();
+    // Generar PDF según el tipo de vista
+    if (formatoVista === 'bySemana') {
+      // *** VISTA POR SEMANA: Crear tabla optimizada en una sola página ***
       
-      try {
-        if (universityImages[uni] && fs.existsSync(universityImages[uni])) {
-          doc.image(
-            universityImages[uni],
-            xPos + 10,
-            yPos + 5,
-            { fit: [dataColWidth * aniosArray.length - 20, 20], align: 'center' }
-          );
-        } else {
+      // Determinar todas las semanas disponibles hasta el límite seleccionado
+      const semanasArray = Array.from({ length: semanasNum }, (_, i) => i + 1);
+      
+      // Calcular ancho de las columnas
+      const pageWidth = doc.page.width - 80; // 40px de margen en cada lado
+      const firstColWidth = 80; // Ancho de la primera columna (semanas)
+      const totalColWidth = 80; // Ancho de la columna de totales
+      const dataColWidth = (pageWidth - firstColWidth - totalColWidth) / (UNIVERSITIES.length * aniosArray.length);
+      
+      // Posición vertical actual
+      let yPos = doc.y;
+      
+      // Dibujar encabezado de la tabla
+      doc.rect(40, yPos, pageWidth, 60).fillAndStroke('#f5f5f5', '#cccccc'); // Fondo gris claro
+      
+      // Primera fila: Nombre de universidades
+      let xPos = 40 + firstColWidth;
+      doc.fontSize(10).fillColor('#000000');
+      doc.text('Semana', 50, yPos + 15, { width: firstColWidth - 20, align: 'center' });
+      
+      // Dibujar logos de universidades
+      UNIVERSITIES.forEach(uni => {
+        doc.rect(xPos, yPos, dataColWidth * aniosArray.length, 30).stroke();
+        
+        try {
+          if (universityImages[uni] && fs.existsSync(universityImages[uni])) {
+            doc.image(
+              universityImages[uni],
+              xPos + 10,
+              yPos + 5,
+              { fit: [dataColWidth * aniosArray.length - 20, 20], align: 'center' }
+            );
+          } else {
+            doc.text(uni, xPos + 5, yPos + 10, { width: dataColWidth * aniosArray.length - 10, align: 'center' });
+          }
+        } catch (err) {
           doc.text(uni, xPos + 5, yPos + 10, { width: dataColWidth * aniosArray.length - 10, align: 'center' });
         }
-      } catch (err) {
-        doc.text(uni, xPos + 5, yPos + 10, { width: dataColWidth * aniosArray.length - 10, align: 'center' });
-      }
-      
-      xPos += dataColWidth * aniosArray.length;
-    });
-    
-    // Columna de TOTAL
-    doc.rect(xPos, yPos, totalColWidth, 30).stroke();
-    doc.text('TOTAL', xPos + 5, yPos + 10, { width: totalColWidth - 10, align: 'center', continued: false });
-    
-    // Segunda fila: Años bajo universidades
-    yPos += 30;
-    xPos = 40 + firstColWidth;
-    
-    UNIVERSITIES.forEach(uni => {
-      aniosArray.forEach(year => {
-        doc.rect(xPos, yPos, dataColWidth, 30).stroke();
-        doc.text(year.toString(), xPos + 5, yPos + 10, { width: dataColWidth - 10, align: 'center' });
-        xPos += dataColWidth;
+        
+        xPos += dataColWidth * aniosArray.length;
       });
-    });
-    
-    // Columna de totales
-    doc.rect(xPos, yPos, totalColWidth, 30).stroke();
-    
-    // Filas de datos
-    yPos += 30;
-    
-    // Colores para filas alternadas
-    const rowColors = ['#ffffff', '#f9f9f9'];
-    
-    // Para cada semana, crear una fila
-    semanasArray.forEach((semana, index) => {
-      const rowColor = rowColors[index % 2];
       
-      // Si necesitamos una nueva página
-      if (yPos > doc.page.height - 100) {
-        doc.addPage();
-        yPos = 60; // Reiniciar posición Y
-        
-        // Repetir encabezados en la nueva página
-        doc.fontSize(14).text('Concentrado de Universidades (continuación)', {
-          align: 'center'
+      // Columna de TOTAL
+      doc.rect(xPos, yPos, totalColWidth, 30).stroke();
+      doc.text('TOTAL', xPos + 5, yPos + 10, { width: totalColWidth - 10, align: 'center', continued: false });
+      
+      // Segunda fila: Años bajo universidades
+      yPos += 30;
+      xPos = 40 + firstColWidth;
+      
+      UNIVERSITIES.forEach(uni => {
+        aniosArray.forEach(year => {
+          doc.rect(xPos, yPos, dataColWidth, 30).stroke();
+          doc.text(year.toString(), xPos + 5, yPos + 10, { width: dataColWidth - 10, align: 'center' });
+          xPos += dataColWidth;
         });
-        doc.moveDown();
+      });
+      
+      // Columna de totales
+      doc.rect(xPos, yPos, totalColWidth, 30).stroke();
+      
+      // Filas de datos
+      yPos += 30;
+      
+      // Colores para filas alternadas
+      const rowColors = ['#ffffff', '#f9f9f9'];
+      
+      // Para cada semana, crear una fila
+      semanasArray.forEach((semana, index) => {
+        const rowColor = rowColors[index % 2];
         
-        // Dibujar el encabezado de nuevo
-        doc.rect(40, yPos, pageWidth, 60).fillAndStroke('#f5f5f5', '#cccccc');
+        // Si necesitamos una nueva página
+        if (yPos > doc.page.height - 100) {
+          doc.addPage();
+          yPos = 60; // Reiniciar posición Y
+          
+          // Repetir encabezados en la nueva página
+          doc.fontSize(14).text('Concentrado de Universidades (continuación)', {
+            align: 'center'
+          });
+          doc.moveDown();
+          
+          // Dibujar el encabezado de nuevo
+          doc.rect(40, yPos, pageWidth, 60).fillAndStroke('#f5f5f5', '#cccccc');
+          
+          // Primera fila: Nombre de universidades
+          let xHeader = 40 + firstColWidth;
+          doc.fontSize(10).fillColor('#000000');
+          doc.text('Semana', 50, yPos + 15, { width: firstColWidth - 20, align: 'center' });
+          
+          // Dibujar logos de universidades
+          UNIVERSITIES.forEach(uni => {
+            doc.rect(xHeader, yPos, dataColWidth * aniosArray.length, 30).stroke();
+            doc.text(uni, xHeader + 5, yPos + 10, { width: dataColWidth * aniosArray.length - 10, align: 'center' });
+            xHeader += dataColWidth * aniosArray.length;
+          });
+          
+          // Columna de TOTAL
+          doc.rect(xHeader, yPos, totalColWidth, 30).stroke();
+          doc.text('TOTAL', xHeader + 5, yPos + 10, { width: totalColWidth - 10, align: 'center' });
+          
+          // Segunda fila: Años bajo universidades
+          yPos += 30;
+          xHeader = 40 + firstColWidth;
+          
+          UNIVERSITIES.forEach(uni => {
+            aniosArray.forEach(year => {
+              doc.rect(xHeader, yPos, dataColWidth, 30).stroke();
+              doc.text(year.toString(), xHeader + 5, yPos + 10, { width: dataColWidth - 10, align: 'center' });
+              xHeader += dataColWidth;
+            });
+          });
+          
+          // Columna de totales
+          doc.rect(xHeader, yPos, totalColWidth, 30).stroke();
+          
+          yPos += 30;
+        }
         
-        // Primera fila: Nombre de universidades
-        let xHeader = 40 + firstColWidth;
-        doc.fontSize(10).fillColor('#000000');
-        doc.text('Semana', 50, yPos + 15, { width: firstColWidth - 20, align: 'center' });
+        // Fondo para la fila
+        doc.rect(40, yPos, pageWidth, 30).fill(rowColor);
         
-        // Dibujar logos de universidades
+        // Celda de semana
+        doc.rect(40, yPos, firstColWidth, 30).stroke();
+        doc.fillColor('#000000').text(`S${semana}`, 50, yPos + 10, { width: firstColWidth - 20, align: 'center' });
+        
+        // Inicializar total de fila
+        let rowTotal = 0;
+        
+        // Celdas de datos
+        xPos = 40 + firstColWidth;
+        
         UNIVERSITIES.forEach(uni => {
-          doc.rect(xHeader, yPos, dataColWidth * aniosArray.length, 30).stroke();
-          doc.text(uni, xHeader + 5, yPos + 10, { width: dataColWidth * aniosArray.length - 10, align: 'center' });
-          xHeader += dataColWidth * aniosArray.length;
-        });
-        
-        // Columna de TOTAL
-        doc.rect(xHeader, yPos, totalColWidth, 30).stroke();
-        doc.text('TOTAL', xHeader + 5, yPos + 10, { width: totalColWidth - 10, align: 'center' });
-        
-        // Segunda fila: Años bajo universidades
-        yPos += 30;
-        xHeader = 40 + firstColWidth;
-        
-        UNIVERSITIES.forEach(uni => {
+          const uniData = reporteData[uni];
+          
           aniosArray.forEach(year => {
-            doc.rect(xHeader, yPos, dataColWidth, 30).stroke();
-            doc.text(year.toString(), xHeader + 5, yPos + 10, { width: dataColWidth - 10, align: 'center' });
-            xHeader += dataColWidth;
+            doc.rect(xPos, yPos, dataColWidth, 30).stroke();
+            
+            // Buscar valor para esta universidad, año y semana
+            let value = 0;
+            
+            if (uniData && uniData.regular) {
+              // Buscar todos los registros para esta combinación y sumarlos
+              const regularDataItems = uniData.regular.filter(
+                item => item.semana === semana && item.anio === year
+              );
+              
+              // Sumar todos los valores
+              value = regularDataItems.reduce(
+                (sum, item) => sum + (typeof item.cantidad === 'number' ? Number(item.cantidad) : 0),
+                0
+              );
+            }
+            
+            // Mostrar valor
+            doc.text(value.toString(), xPos + 5, yPos + 10, { width: dataColWidth - 10, align: 'center' });
+            
+            // Sumar al total de la fila
+            rowTotal += value;
+            
+            xPos += dataColWidth;
           });
         });
         
-        // Columna de totales
-        doc.rect(xHeader, yPos, totalColWidth, 30).stroke();
+        // Celda de total de fila
+        doc.rect(xPos, yPos, totalColWidth, 30).fillAndStroke('#e6f7ff', '#cccccc');
+        doc.fillColor('#000000'); // Establecer explícitamente el color del texto a negro
+        doc.text(rowTotal.toString(), xPos + 5, yPos + 10, { width: totalColWidth - 10, align: 'center' });
         
         yPos += 30;
-      }
+      });
       
-      // Fondo para la fila
-      doc.rect(40, yPos, pageWidth, 30).fill(rowColor);
+      // Fila de totales
+      doc.rect(40, yPos, pageWidth, 40).fillAndStroke('#e6f7ff', '#000000');
+      doc.fillColor('#000000'); 
+      doc.rect(40, yPos, firstColWidth, 40).stroke();
+      doc.fontSize(12).text('Totales', 50, yPos + 15, { width: firstColWidth - 20, align: 'center' });
       
-      // Celda de semana
-      doc.rect(40, yPos, firstColWidth, 30).stroke();
-      doc.fillColor('#000000').text(`S${semana}`, 50, yPos + 10, { width: firstColWidth - 20, align: 'center' });
+      // Inicializar total general
+      let grandTotal = 0;
       
-      // Inicializar total de fila
-      let rowTotal = 0;
-      
-      // Celdas de datos
+      // Celdas de totales por columna
       xPos = 40 + firstColWidth;
       
       UNIVERSITIES.forEach(uni => {
         const uniData = reporteData[uni];
         
         aniosArray.forEach(year => {
-          doc.rect(xPos, yPos, dataColWidth, 30).stroke();
+          doc.rect(xPos, yPos, dataColWidth, 40).stroke();
           
-          // Buscar valor para esta universidad, año y semana
-          let value = 0;
+          // Calcular total para esta universidad y año usando regular en lugar de acumulado
+          let columnTotal = 0;
           
           if (uniData && uniData.regular) {
-            const regularData = uniData.regular.find(
-              item => item.semana === semana && item.anio === year
+            // Sumar todos los valores regulares para esta universidad y año
+            const regularItems = uniData.regular.filter(
+              item => item.anio === year && item.semana <= semanasNum
             );
             
-            if (regularData && regularData.cantidad) {
-              value = regularData.cantidad;
-            }
+            columnTotal = regularItems.reduce(
+              (sum, item) => sum + (typeof item.cantidad === 'number' ? Number(item.cantidad) : 0),
+              0
+            );
           }
           
-          // Mostrar valor
-          doc.text(value.toString(), xPos + 5, yPos + 10, { width: dataColWidth - 10, align: 'center' });
+          // Mostrar total
+          doc.fontSize(10)
+          .fillColor('#000000')
+          .text(columnTotal.toString(), xPos + 5, yPos + 10, { width: dataColWidth - 10, align: 'center' });
           
-          // Sumar al total de la fila
-          rowTotal += value;
+          // Calcular diferencia si hay más de un año
+          if (aniosArray.length > 1 && year === aniosArray[aniosArray.length - 1] && aniosArray.includes(year - 1)) {
+            // Buscar valor del año anterior
+            let prevColumnTotal = 0;
+            
+            if (uniData && uniData.regular) {
+              const prevRegularItems = uniData.regular.filter(
+                item => item.anio === (year - 1) && item.semana <= semanasNum
+              );
+              
+              prevColumnTotal = prevRegularItems.reduce(
+                (sum, item) => sum + (typeof item.cantidad === 'number' ? Number(item.cantidad) : 0),
+                0
+              );
+            }
+            
+            // Calcular diferencia
+            const diff = columnTotal - prevColumnTotal;
+            const diffText = `(${diff > 0 ? '+' : ''}${diff})`;
+            
+            // Mostrar diferencia
+            doc.fontSize(8)
+              .fillColor(diff >= 0 ? 'green' : 'red')
+              .text(diffText, xPos + 5, yPos + 25, { width: dataColWidth - 10, align: 'center' });
+          }
+          
+          // Sumar al total general
+          grandTotal += columnTotal;
           
           xPos += dataColWidth;
         });
       });
       
-      // Celda de total de fila
-      doc.rect(xPos, yPos, totalColWidth, 30).fillAndStroke('#e6f7ff', '#cccccc');
-      doc.fillColor('#000000'); // Establecer explícitamente el color del texto a negro
-      doc.text(rowTotal.toString(), xPos + 5, yPos + 10, { width: totalColWidth - 10, align: 'center' });
+      // Celda de total general
+      doc.rect(xPos, yPos, totalColWidth, 40).fillAndStroke('#e6f7ff', '#000000');
+      doc.fontSize(12).fillColor('#000000').text(grandTotal.toString(), xPos + 5, yPos + 15, { width: totalColWidth - 10, align: 'center' });
+    }
+    else if (formatoVista === 'byUniversidad') {
+      // *** VISTA POR UNIVERSIDAD: Crear tabla optimizada con universidades en filas y semanas en columnas ***
       
-      yPos += 30;
-    });
-    
-    // Fila de totales
-    doc.rect(40, yPos, pageWidth, 40).fillAndStroke('#e6f7ff', '#000000');
-    doc.fillColor('#000000'); 
-    doc.rect(40, yPos, firstColWidth, 40).stroke();
-    doc.fontSize(12).text('Totales', 50, yPos + 15, { width: firstColWidth - 20, align: 'center' });
-    
-    // Inicializar total general
-    let grandTotal = 0;
-    
-    // Celdas de totales por columna
-    xPos = 40 + firstColWidth;
-    
-    UNIVERSITIES.forEach(uni => {
-      const uniData = reporteData[uni];
+      // Determinar todas las semanas disponibles hasta el límite seleccionado
+      const semanasArray = Array.from({ length: semanasNum }, (_, i) => i + 1);
       
-      aniosArray.forEach(year => {
-        doc.rect(xPos, yPos, dataColWidth, 40).stroke();
-        
-        // Calcular total para esta universidad y año
-        let columnTotal = 0;
-        
-        if (uniData && uniData.acumulado) {
-          // Buscar el último acumulado para este año
-          const acumulados = uniData.acumulado
-            .filter(item => item.anio === year && item.semana <= semanasNum)
-            .sort((a, b) => b.semana - a.semana);
-          
-          if (acumulados.length > 0 && acumulados[0].acumulado) {
-            columnTotal = acumulados[0].acumulado;
-          }
-        }
-        
-        // Mostrar total
-        doc.fontSize(10)
-        .fillColor('#000000')
-        .text(columnTotal.toString(), xPos + 5, yPos + 10, { width: dataColWidth - 10, align: 'center' });
-        
-        // Calcular diferencia si hay más de un año
-        if (aniosArray.length > 1 && year === aniosArray[aniosArray.length - 1] && aniosArray.includes(year - 1)) {
-          // Buscar valor del año anterior
-          let prevColumnTotal = 0;
-          
-          if (uniData && uniData.acumulado) {
-            const prevAcumulados = uniData.acumulado
-              .filter(item => item.anio === (year - 1) && item.semana <= semanasNum)
-              .sort((a, b) => b.semana - a.semana);
-            
-            if (prevAcumulados.length > 0 && prevAcumulados[0].acumulado) {
-              prevColumnTotal = prevAcumulados[0].acumulado;
-            }
-          }
-          
-          // Calcular diferencia
-          const diff = columnTotal - prevColumnTotal;
-          const diffText = `(${diff > 0 ? '+' : ''}${diff})`;
-          
-          // Mostrar diferencia
-          doc.fontSize(8)
-            .fillColor(diff >= 0 ? 'green' : 'red')
-            .text(diffText, xPos + 5, yPos + 25, { width: dataColWidth - 10, align: 'center' });
-        }
-        
-        // Sumar al total general
-        grandTotal += columnTotal;
-        
-        xPos += dataColWidth;
+      // Calcular ancho de las columnas
+      const pageWidth = doc.page.width - 80; // 40px de margen en cada lado
+      const firstColWidth = 120; // Ancho de la primera columna (universidades)
+      const totalColWidth = 80; // Ancho de la columna de totales
+      const dataColWidth = (pageWidth - firstColWidth - totalColWidth) / (semanasArray.length * aniosArray.length);
+      
+      // Posición vertical actual
+      let yPos = doc.y;
+      
+      // Dibujar encabezado de la tabla
+      doc.rect(40, yPos, pageWidth, 60).fillAndStroke('#f5f5f5', '#cccccc'); // Fondo gris claro
+      
+      // Primera fila: Nombre de semanas
+      let xPos = 40 + firstColWidth;
+      doc.fontSize(10).fillColor('#000000');
+      doc.text('Universidad', 50, yPos + 15, { width: firstColWidth - 20, align: 'center' });
+      
+      // Dibujar encabezados de semanas
+      semanasArray.forEach(semana => {
+        doc.rect(xPos, yPos, dataColWidth * aniosArray.length, 30).stroke();
+        doc.text(`Semana ${semana}`, xPos + 5, yPos + 10, { 
+          width: dataColWidth * aniosArray.length - 10, 
+          align: 'center' 
+        });
+        xPos += dataColWidth * aniosArray.length;
       });
-    });
-    
-    // Celda de total general
-    doc.rect(xPos, yPos, totalColWidth, 40).fillAndStroke('#e6f7ff', '#000000');
-    doc.fontSize(12).fillColor('#000000').text(grandTotal.toString(), xPos + 5, yPos + 15, { width: totalColWidth - 10, align: 'center' });
+      
+      // Columna de TOTAL
+      doc.rect(xPos, yPos, totalColWidth, 30).stroke();
+      doc.text('TOTAL', xPos + 5, yPos + 10, { width: totalColWidth - 10, align: 'center' });
+      
+      // Segunda fila: Años bajo semanas
+      yPos += 30;
+      xPos = 40 + firstColWidth;
+      
+      semanasArray.forEach(semana => {
+        aniosArray.forEach(year => {
+          doc.rect(xPos, yPos, dataColWidth, 30).stroke();
+          doc.text(year.toString(), xPos + 5, yPos + 10, { width: dataColWidth - 10, align: 'center' });
+          xPos += dataColWidth;
+        });
+      });
+      
+      // Columna de totales
+      doc.rect(xPos, yPos, totalColWidth, 30).stroke();
+      
+      // Filas de datos
+      yPos += 30;
+      
+      // Colores para filas alternadas
+      const rowColors = ['#ffffff', '#f9f9f9'];
+      
+      // Para cada universidad, crear una fila
+      UNIVERSITIES.forEach((uni, index) => {
+        const rowColor = rowColors[index % 2];
+        
+        // Si necesitamos una nueva página
+        if (yPos > doc.page.height - 100) {
+          doc.addPage();
+          yPos = 60; // Reiniciar posición Y
+          
+          // Repetir encabezados en la nueva página
+          doc.fontSize(14).text('Concentrado de Universidades (continuación)', {
+            align: 'center'
+          });
+          doc.moveDown();
+          
+          // Dibujar el encabezado de nuevo
+          doc.rect(40, yPos, pageWidth, 60).fillAndStroke('#f5f5f5', '#cccccc');
+          
+          // Primera fila: Nombre de semanas
+          let xHeader = 40 + firstColWidth;
+          doc.fontSize(10).fillColor('#000000');
+          doc.text('Universidad', 50, yPos + 15, { width: firstColWidth - 20, align: 'center' });
+          
+          // Dibujar encabezados de semanas
+          semanasArray.forEach(semana => {
+            doc.rect(xHeader, yPos, dataColWidth * aniosArray.length, 30).stroke();
+            doc.text(`Semana ${semana}`, xHeader + 5, yPos + 10, { 
+              width: dataColWidth * aniosArray.length - 10, 
+              align: 'center' 
+            });
+            xHeader += dataColWidth * aniosArray.length;
+          });
+          
+          // Columna de TOTAL
+          doc.rect(xHeader, yPos, totalColWidth, 30).stroke();
+          doc.text('TOTAL', xHeader + 5, yPos + 10, { width: totalColWidth - 10, align: 'center' });
+          
+          // Segunda fila: Años bajo semanas
+          yPos += 30;
+          xHeader = 40 + firstColWidth;
+          
+          semanasArray.forEach(semana => {
+            aniosArray.forEach(year => {
+              doc.rect(xHeader, yPos, dataColWidth, 30).stroke();
+              doc.text(year.toString(), xHeader + 5, yPos + 10, { width: dataColWidth - 10, align: 'center' });
+              xHeader += dataColWidth;
+            });
+          });
+          
+          // Columna de totales
+          doc.rect(xHeader, yPos, totalColWidth, 30).stroke();
+          
+          yPos += 30;
+        }
+        
+        // Fondo para la fila
+        doc.rect(40, yPos, pageWidth, 30).fill(rowColor);
+        
+        // Celda de universidad
+        doc.rect(40, yPos, firstColWidth, 30).stroke();
+        doc.fillColor('#000000').text(uni, 50, yPos + 10, { width: firstColWidth - 20, align: 'center' });
+        
+        // Inicializar total de fila
+        let rowTotal = 0;
+        
+        // Celdas de datos
+        xPos = 40 + firstColWidth;
+        
+        semanasArray.forEach(semana => {
+          aniosArray.forEach(year => {
+            doc.rect(xPos, yPos, dataColWidth, 30).stroke();
+            
+            // Buscar valor para esta universidad, semana y año
+            let value = 0;
+            
+            if (reporteData[uni] && reporteData[uni].regular) {
+              const regularDataItems = reporteData[uni].regular.filter(
+                item => item.semana === semana && item.anio === year
+              );
+              
+              value = regularDataItems.reduce(
+                (sum, item) => sum + (typeof item.cantidad === 'number' ? Number(item.cantidad) : 0),
+                0
+              );
+            }
+            
+            // Mostrar valor
+            doc.fillColor('#000000').text(value.toString(), xPos + 5, yPos + 10, { width: dataColWidth - 10, align: 'center' });
+            
+            // Sumar al total de la fila
+            rowTotal += value;
+            
+            xPos += dataColWidth;
+          });
+        });
+        
+        // Celda de total de fila
+        doc.rect(xPos, yPos, totalColWidth, 30).fillAndStroke('#e6f7ff', '#cccccc');
+        doc.fillColor('#000000').text(rowTotal.toString(), xPos + 5, yPos + 10, { width: totalColWidth - 10, align: 'center' });
+        
+        yPos += 30;
+      });
+      
+      // Fila de totales
+      doc.rect(40, yPos, pageWidth, 40).fillAndStroke('#e6f7ff', '#000000');
+      doc.fillColor('#000000');
+      doc.rect(40, yPos, firstColWidth, 40).stroke();
+      doc.fontSize(12).text('Totales', 50, yPos + 15, { width: firstColWidth - 20, align: 'center' });
+      
+      // Inicializar total general
+      let grandTotal = 0;
+      
+      // Celdas de totales por columna
+      xPos = 40 + firstColWidth;
+      
+      semanasArray.forEach(semana => {
+        aniosArray.forEach(year => {
+          doc.rect(xPos, yPos, dataColWidth, 40).stroke();
+          
+          // Calcular total para esta semana y año
+          let columnTotal = 0;
+          
+          UNIVERSITIES.forEach(uni => {
+            if (reporteData[uni] && reporteData[uni].regular) {
+              const regularDataItems = reporteData[uni].regular.filter(
+                item => item.semana === semana && item.anio === year
+              );
+              
+              columnTotal += regularDataItems.reduce(
+                (sum, item) => sum + (typeof item.cantidad === 'number' ? Number(item.cantidad) : 0),
+                0
+              );
+            }
+          });
+          
+          // Mostrar total
+          doc.fillColor('#000000').fontSize(10).text(columnTotal.toString(), xPos + 5, yPos + 10, { width: dataColWidth - 10, align: 'center' });
+          
+          // Sumar al total general
+          grandTotal += columnTotal;
+          
+          xPos += dataColWidth;
+        });
+      });
+      
+      // Celda de total general
+      doc.rect(xPos, yPos, totalColWidth, 40).fillAndStroke('#e6f7ff', '#000000');
+      doc.fillColor('#000000').fontSize(12).text(grandTotal.toString(), xPos + 5, yPos + 15, { width: totalColWidth - 10, align: 'center' });
+    }
     
     // Numerar páginas
     const totalPages = doc.bufferedPageRange().count;
     for (let i = 0; i < totalPages; i++) {
       doc.switchToPage(i);
-      doc.fontSize(8).text(`Página ${i + 1} de ${totalPages}`, 40, doc.page.height - 40, { align: 'center' });
+      doc.fontSize(8).fillColor('#000000').text(`Página ${i + 1} de ${totalPages}`, 40, doc.page.height - 40, { align: 'center' });
     }
     
     // Finalizar el documento
