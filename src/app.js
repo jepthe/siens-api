@@ -700,7 +700,7 @@ app.get('/', (req, res) => {
 // Ruta de prueba para la BD
 app.get('/api/test-db', async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT * FROM tcAnio LIMIT 5');
+    const [rows] = await db.query('SELECT * FROM tcanio LIMIT 5');
     res.json({ success: true, data: rows });
   } catch (error) {
     console.error('Error en test de BD:', error);
@@ -711,7 +711,7 @@ app.get('/api/test-db', async (req, res) => {
 // Endpoint para universidades
 app.get('/api/universidades', async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT * FROM tcUniversidad WHERE bActivo = 1');
+    const [rows] = await db.query('SELECT * FROM tcuniversidad WHERE bActivo = 1');
     res.json(rows);
   } catch (error) {
     console.error('Error al obtener universidades:', error);
@@ -736,9 +736,9 @@ app.get('/api/reportes/universidad/:idUniversidad', async (req, res) => {
         f.iIdSemana, s.iNumeroSemana as semana,
         f.iHombre, f.iMujer, f.iCantidad 
       FROM 
-        tdFicha f
-        JOIN tcAnio a ON f.iIdAnio = a.iIdAnio
-        JOIN tcSemana s ON f.iIdSemana = s.iIdSemana
+        tdficha f
+        JOIN tcanio a ON f.iIdAnio = a.iIdAnio
+        JOIN tcsemana s ON f.iIdSemana = s.iIdSemana
       WHERE 
         f.iIdUniversidad = ?
         AND s.iNumeroSemana <= ?
@@ -802,8 +802,8 @@ app.post('/api/auth/login', async (req, res) => {
     // Primero intentamos buscar por correo electrónico
     const [usersByEmail] = await db.query(
       `SELECT u.*, d.cCorreo, d.cNombreCompleto 
-       FROM tdUsuario u
-       LEFT JOIN tdDetallesUsuario d ON u.iIdUsuario = d.iIdUsuario
+       FROM tdusuario u
+       LEFT JOIN tddetallesusuario d ON u.iIdUsuario = d.iIdUsuario
        WHERE d.cCorreo = ?`,
       [email]
     );
@@ -814,8 +814,8 @@ app.post('/api/auth/login', async (req, res) => {
       
       const [usersByUsername] = await db.query(
         `SELECT u.*, d.cCorreo, d.cNombreCompleto 
-         FROM tdUsuario u
-         LEFT JOIN tdDetallesUsuario d ON u.iIdUsuario = d.iIdUsuario
+         FROM tdusuario u
+         LEFT JOIN tddetallesusuario d ON u.iIdUsuario = d.iIdUsuario
          WHERE u.cNombreUsuario = ?`,
         [email]
       );
@@ -842,7 +842,7 @@ app.post('/api/auth/login', async (req, res) => {
     
     // Obtener el rol del usuario
     const [roles] = await db.query(
-      'SELECT r.cNombreRol FROM tcRol r WHERE r.iIdRol = ?',
+      'SELECT r.cNombreRol FROM tcrol r WHERE r.iIdRol = ?',
       [user.iIdRol]
     );
     
@@ -902,7 +902,7 @@ app.get('/api/reportes/todas', async (req, res) => {
     console.log(`Obteniendo reporte para todas las universidades, años:`, anios, 'semanas:', semanas);
     
     // Primero obtenemos todas las universidades activas
-    const [universidades] = await db.query('SELECT iIdUniversidad, cNombreCorto FROM tcUniversidad WHERE bActivo = 1');
+    const [universidades] = await db.query('SELECT iIdUniversidad, cNombreCorto FROM tcuniversidad WHERE bActivo = 1');
     
     // Objeto para almacenar resultados por universidad
     const resultados = {};
@@ -920,9 +920,9 @@ app.get('/api/reportes/todas', async (req, res) => {
           f.iIdSemana, s.iNumeroSemana as semana,
           f.iHombre, f.iMujer, f.iCantidad 
         FROM 
-          tdFicha f
-          JOIN tcAnio a ON f.iIdAnio = a.iIdAnio
-          JOIN tcSemana s ON f.iIdSemana = s.iIdSemana
+          tdficha f
+          JOIN tcanio a ON f.iIdAnio = a.iIdAnio
+          JOIN tcsemana s ON f.iIdSemana = s.iIdSemana
         WHERE 
           f.iIdUniversidad = ?
           AND s.iNumeroSemana <= ?

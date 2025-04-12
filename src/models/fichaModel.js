@@ -5,7 +5,7 @@ const fichaModel = {
   findByUniversidadAnioSemana: async (universidadId, anioId, semanaId) => {
     try {
       const [rows] = await db.query(
-        `SELECT * FROM tdFicha 
+        `SELECT * FROM tdficha 
          WHERE iIdUniversidad = ? AND iIdAnio = ? AND iIdSemana = ?`,
         [universidadId, anioId, semanaId]
       );
@@ -30,9 +30,9 @@ const fichaModel = {
            s.iNumeroSemana as semana,
            SUM(f.iCantidad) as cantidad
          FROM 
-           tdFicha f
-           JOIN tcAnio a ON f.iIdAnio = a.iIdAnio
-           JOIN tcSemana s ON f.iIdSemana = s.iIdSemana
+           tdficha f
+           JOIN tcanio a ON f.iIdAnio = a.iIdAnio
+           JOIN tcsemana s ON f.iIdSemana = s.iIdSemana
          WHERE 
            f.iIdUniversidad = ?
            AND f.iIdAnio IN (${aniosStr})
@@ -92,7 +92,7 @@ getReporteTodasUniversidades: async (anios, semanas) => {
   try {
     // Obtener todas las universidades activas
     const [universidades] = await db.query(
-      'SELECT iIdUniversidad, cNombreCorto FROM tcUniversidad WHERE bActivo = 1'
+      'SELECT iIdUniversidad, cNombreCorto FROM tcuniversidad WHERE bActivo = 1'
     );
     
     const resultados = {};
@@ -118,9 +118,9 @@ getReporteTodasUniversidades: async (anios, semanas) => {
           s.iNumeroSemana as semana,
           SUM(f.iCantidad) as suma_cantidad
         FROM 
-          tdFicha f
-          JOIN tcSemana s ON f.iIdSemana = s.iIdSemana
-          JOIN tcAnio a ON s.iIdAnio = a.iIdAnio
+          tdficha f
+          JOIN tcsemana s ON f.iIdSemana = s.iIdSemana
+          JOIN tcanio a ON s.iIdAnio = a.iIdAnio
         WHERE 
           f.iIdUniversidad = ?
           AND a.cAnio IN (${anios.map(() => '?').join(',')})

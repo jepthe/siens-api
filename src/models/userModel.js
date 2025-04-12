@@ -8,8 +8,8 @@ const userModel = {
     try {
       const [rows] = await db.query(
         `SELECT u.*, r.cNombreRol AS nombreRol 
-         FROM tdUsuario u
-         LEFT JOIN tcRol r ON u.iIdRol = r.iIdRol
+         FROM tdusuario u
+         LEFT JOIN tcrol r ON u.iIdRol = r.iIdRol
          WHERE u.cNombreUsuario = ?`,
         [username]
       );
@@ -25,7 +25,7 @@ const userModel = {
       const [rows] = await db.query(
         `SELECT u.*, r.cNombreRol AS nombreRol
           FROM tcUsuario u
-         LEFT JOIN tcRol r ON u.iIdRol = r.iIdRol
+         LEFT JOIN tcrol r ON u.iIdRol = r.iIdRol
          WHERE u.cNombreUsuario = ?`,
         [username]
       );
@@ -40,8 +40,8 @@ const userModel = {
     try {
       const [rows] = await db.query(
         `SELECT u.*, d.cCorreo, d.cNombreCompleto 
-         FROM tdUsuario u
-         INNER JOIN tdDetallesUsuario d ON u.iIdUsuario = d.iIdUsuario
+         FROM tdusuario u
+         INNER JOIN tddetallesusuario d ON u.iIdUsuario = d.iIdUsuario
          WHERE d.cCorreo = ?`,
         [email]
       );
@@ -57,7 +57,7 @@ const userModel = {
       // Esto es solo para verificar si la contraseña en texto plano ya existe
       // Es un método simplificado para el proceso de recuperación de contraseña
       const [rows] = await db.query(
-        'SELECT COUNT(*) as count FROM tdUsuario WHERE cContraseña = ?',
+        'SELECT COUNT(*) as count FROM tdusuario WHERE cContraseña = ?',
         [password]
       );
       
@@ -72,7 +72,7 @@ const userModel = {
     try {
       // Guarda la contraseña en texto plano para que el usuario pueda usarla después de recibir el correo
       await db.query(
-        'UPDATE tdUsuario SET cContraseña = ? WHERE iIdUsuario = ?',
+        'UPDATE tdusuario SET cContraseña = ? WHERE iIdUsuario = ?',
         [password, userId]
       );
       return true;
@@ -92,7 +92,7 @@ const userModel = {
       console.log('Hash generado:', hashedPassword);
       
       await db.query(
-        'UPDATE tdUsuario SET cContraseña = ? WHERE iIdUsuario = ?',
+        'UPDATE tdusuario SET cContraseña = ? WHERE iIdUsuario = ?',
         [hashedPassword, userId]
       );
       
@@ -109,7 +109,7 @@ const userModel = {
     try {
       const hashedPassword = await bcrypt.hash(plainPassword, 12);
       await db.query(
-        'UPDATE tdUsuario SET cContraseña = ? WHERE iIdUsuario = ?',
+        'UPDATE tdusuario SET cContraseña = ? WHERE iIdUsuario = ?',
         [hashedPassword, userId]
       );
       return true;

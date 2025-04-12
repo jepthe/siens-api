@@ -5,7 +5,7 @@ const universidadModel = {
   findAll: async () => {
     try {
       const [rows] = await db.query(
-        'SELECT * FROM tcUniversidad WHERE bActivo = 1'
+        'SELECT * FROM tcuniversidad WHERE bActivo = 1'
       );
       return rows;
     } catch (error) {
@@ -16,7 +16,7 @@ const universidadModel = {
   findById: async (id) => {
     try {
       const [rows] = await db.query(
-        'SELECT * FROM tcUniversidad WHERE iIdUniversidad = ? AND bActivo = 1',
+        'SELECT * FROM tcuniversidad WHERE iIdUniversidad = ? AND bActivo = 1',
         [id]
       );
       return rows[0];
