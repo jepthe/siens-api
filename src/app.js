@@ -532,11 +532,12 @@ app.get('/api/reportes/pdf', async (req, res) => {
             doc.translate(xPos + (dataColWidth/2), yPos + 15);
             
             // Rotar 90 grados en sentido anti-horario
-            doc.rotate(-90);
+            //doc.rotate(-90);
             
             // Dibujar el texto con fuente más pequeña
-            doc.fontSize(7).fillColor('#000000').text(year.toString(), -10, -4, { 
-              align: 'center'
+            doc.fillColor('#000000').fontSize(7).text(year.toString(), xPos + 2, yPos + 10, { 
+              width: dataColWidth - 4, 
+              align: 'center' 
             });
             
             // Restaurar el estado original
