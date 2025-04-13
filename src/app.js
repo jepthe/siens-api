@@ -149,9 +149,9 @@ app.get('/api/reportes/pdf', async (req, res) => {
       const semanasArray = Array.from({ length: semanasNum }, (_, i) => i + 1);
       
       // Calcular ancho de las columnas //resize
-      const pageWidth = doc.page.width - 40; // 40px de margen en cada lado
-      const firstColWidth = 40; // Ancho de la primera columna (semanas)
-      const totalColWidth = 40; // Ancho de la columna de totales
+      const pageWidth = doc.page.width - 60; // 40px de margen en cada lado
+      const firstColWidth = 60; // Ancho de la primera columna (semanas)
+      const totalColWidth = 60; // Ancho de la columna de totales
       const dataColWidth = (pageWidth - firstColWidth - totalColWidth) / (UNIVERSITIES.length * aniosArray.length);
       
       // Posición vertical actual
@@ -399,9 +399,9 @@ app.get('/api/reportes/pdf', async (req, res) => {
       const semanasArray = Array.from({ length: semanasNum }, (_, i) => i + 1);
       
       // Calcular ancho de las columnas
-      const pageWidth = doc.page.width - 40; // 40px de margen en cada lado
-      const firstColWidth = 60; // Ancho de la primera columna (universidades)
-      const totalColWidth = 40; // Ancho de la columna de totales
+      const pageWidth = doc.page.width - 60; // 40px de margen en cada lado
+      const firstColWidth = 80; // Ancho de la primera columna (universidades)
+      const totalColWidth = 60; // Ancho de la columna de totales
       const dataColWidth = (pageWidth - firstColWidth - totalColWidth) / (semanasArray.length * aniosArray.length);
       
       // Posición vertical actual
