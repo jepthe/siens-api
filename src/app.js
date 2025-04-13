@@ -97,40 +97,6 @@ app.get('/api/reportes/pdf', async (req, res) => {
       formattedTime = `${String(fallbackDate.getHours()).padStart(2, '0')}:${String(fallbackDate.getMinutes()).padStart(2, '0')}:${String(fallbackDate.getSeconds()).padStart(2, '0')}`;
     }
 
-    // Añadir el logo en la esquina superior izquierda (solo primera página)
-    try {
-      const logoPath = path.join(__dirname, '../frontend/public/img/general/LOGO_pdf.png');
-      
-      if (fs.existsSync(logoPath)) {
-        doc.image(
-          logoPath,
-          50, // margen izquierdo
-          50, // margen superior
-          {
-            fit: [100, 50],
-            align: 'left',
-            valign: 'top'
-          }
-        );
-      }
-    } catch (logoError) {
-      console.error('Error al añadir el logo al PDF:', logoError);
-    }
-
-    // Título del reporte
-    doc.fontSize(24).text('Concentrado de Universidades', {
-      align: 'center'
-    });
-    
-    doc.moveDown();
-    
-    // Información del documento
-    doc.fontSize(10)
-      .text(`Fecha: ${formattedDate} | Hora: ${formattedTime}`, { align: 'right' })
-      .text(`Generado por: ${nombreUsuario}`, { align: 'right' });
-    
-    doc.moveDown(2);
-    
     // Mapeo de nombres de universidades a sus logos
     const universityImages = {
       'UPQ': path.join(__dirname, '../frontend/public/img/universidades/LOGO_UPQ.png'),
@@ -143,6 +109,55 @@ app.get('/api/reportes/pdf', async (req, res) => {
     
     // Generar PDF según el tipo de vista
     if (formatoVista === 'bySemana') {
+      // Para cada página de un PDF, añadir encabezado común con logo
+      const addCommonHeader = (isFirstPage = false) => {
+        // Añadir el logo en la esquina superior izquierda (solo primera página)
+        if (isFirstPage) {
+          try {
+            const logoPath = path.join(__dirname, '../frontend/public/img/general/LOGO_pdf.png');
+            
+            if (fs.existsSync(logoPath)) {
+              doc.image(
+                logoPath,
+                50, // margen izquierdo
+                50, // margen superior
+                {
+                  fit: [100, 50],
+                  align: 'left',
+                  valign: 'top'
+                }
+              );
+            }
+          } catch (logoError) {
+            console.error('Error al añadir el logo al PDF:', logoError);
+          }
+        }
+
+        // Título del reporte (primera página o versión reducida para continuación)
+        if (isFirstPage) {
+          doc.fontSize(24).text('Concentrado de Universidades', {
+            align: 'center'
+          });
+          
+          doc.moveDown();
+          
+          // Información del documento
+          doc.fontSize(10)
+            .text(`Fecha: ${formattedDate} | Hora: ${formattedTime}`, { align: 'right' })
+            .text(`Generado por: ${nombreUsuario}`, { align: 'right' });
+          
+          doc.moveDown(2);
+        } else {
+          doc.fontSize(14).text('Concentrado de Universidades (continuación)', {
+            align: 'center'
+          });
+          doc.moveDown();
+        }
+      };
+
+      // Añadir encabezado común para la primera página
+      addCommonHeader(true);
+      
       // *** VISTA POR SEMANA: Crear tabla optimizada en una sola página ***
       
       // Determinar todas las semanas disponibles hasta el límite seleccionado
@@ -221,11 +236,8 @@ app.get('/api/reportes/pdf', async (req, res) => {
           doc.addPage();
           yPos = 60; // Reiniciar posición Y
           
-          // Repetir encabezados en la nueva página
-          doc.fontSize(14).text('Concentrado de Universidades (continuación)', {
-            align: 'center'
-          });
-          doc.moveDown();
+          // Añadir encabezados comunes para páginas adicionales
+          addCommonHeader(false);
           
           // Dibujar el encabezado de nuevo
           doc.rect(40, yPos, pageWidth, 60).fillAndStroke('#f5f5f5', '#cccccc');
@@ -398,84 +410,163 @@ app.get('/api/reportes/pdf', async (req, res) => {
       // Determinar todas las semanas disponibles hasta el límite seleccionado
       const semanasArray = Array.from({ length: semanasNum }, (_, i) => i + 1);
       
-      // Calcular ancho de las columnas
-      const pageWidth = doc.page.width - 60; // 40px de margen en cada lado
-      const firstColWidth = 80; // Ancho de la primera columna (universidades)
+      // Determinar cuántas semanas mostrar por página 
+      // (calcular según el espacio disponible y el ancho de columnas)
+      const pageWidth = doc.page.width - 60; // 30px de margen en cada lado
+      const firstColWidth = 60; // Ancho de la primera columna (universidades)
       const totalColWidth = 60; // Ancho de la columna de totales
-      const dataColWidth = (pageWidth - firstColWidth - totalColWidth) / (semanasArray.length * aniosArray.length);
+      const minColumnWidth = 15; // Ancho mínimo para cada columna de datos (ajustar según necesidades)
       
-      // Posición vertical actual
-      let yPos = doc.y;
+      // Calcular cuántas semanas pueden caber en una página
+      const semanasPerPage = Math.floor((pageWidth - firstColWidth - totalColWidth) / (minColumnWidth * aniosArray.length));
       
-      // Dibujar encabezado de la tabla
-      doc.rect(40, yPos, pageWidth, 60).fillAndStroke('#f5f5f5', '#cccccc'); // Fondo gris claro
+      // Dividir las semanas en grupos para diferentes páginas
+      const semanaGroups = [];
+      for (let i = 0; i < semanasArray.length; i += semanasPerPage) {
+        semanaGroups.push(semanasArray.slice(i, i + semanasPerPage));
+      }
       
-      // Primera fila: Nombre de semanas
-      let xPos = 40 + firstColWidth;
-      doc.fontSize(10).fillColor('#000000');
-      doc.text('Universidad', 50, yPos + 15, { width: firstColWidth - 20, align: 'center' });
+      console.log(`Dividiendo ${semanasArray.length} semanas en ${semanaGroups.length} páginas`);
       
-      // Dibujar encabezados de semanas
-      semanasArray.forEach(semana => {
-        doc.rect(xPos, yPos, dataColWidth * aniosArray.length, 30).stroke();
-        doc.text(`S${semana}`, xPos + 5, yPos + 10, { 
-          width: dataColWidth * aniosArray.length - 10, 
-          align: 'center' 
-        });
-        xPos += dataColWidth * aniosArray.length;
-      });
-      
-      // Columna de TOTAL
-      doc.rect(xPos, yPos, totalColWidth, 30).stroke();
-      doc.text('TOTAL', xPos + 5, yPos + 10, { width: totalColWidth - 10, align: 'center' });
-      
-      // Segunda fila: Años bajo semanas
-      yPos += 30;
-      xPos = 40 + firstColWidth;
-      
-      semanasArray.forEach(semana => {
-        aniosArray.forEach(year => {
-          doc.rect(xPos, yPos, dataColWidth, 30).stroke();
-          
-          // Guardar el estado actual
-          doc.save();
-          
-          // Mover el punto de origen al centro vertical y ligeramente a la derecha del borde izquierdo de la celda
-          doc.translate(xPos + 10, yPos + 15);
-          
-          // Rotar 90 grados en sentido anti-horario
-          doc.rotate(-90);
-          
-          // Dibujar el texto centrado respecto al nuevo origen
-          doc.fillColor('#000000').text(year.toString(), 0, 0, { 
-            width: 25, // Altura original de la celda, ahora es el ancho del texto rotado
+      // Para cada grupo de semanas, crear una página
+      semanaGroups.forEach((currentSemanas, pageIndex) => {
+        // Si no es la primera página, agregar una nueva
+        if (pageIndex > 0) {
+          doc.addPage();
+        }
+        
+        // Posición vertical actual para esta página
+        let yPos = 100; // Dejar espacio para encabezado
+        
+        // Añadir encabezado con logo para la primera página
+        if (pageIndex === 0) {
+          try {
+            const logoPath = path.join(__dirname, '../frontend/public/img/general/LOGO_pdf.png');
+            
+            if (fs.existsSync(logoPath)) {
+              doc.image(
+                logoPath,
+                50, // margen izquierdo
+                50, // margen superior
+                {
+                  fit: [100, 50],
+                  align: 'left',
+                  valign: 'top'
+                }
+              );
+            }
+          } catch (logoError) {
+            console.error('Error al añadir el logo al PDF:', logoError);
+          }
+
+          // Título del reporte
+          doc.fontSize(24).text('Concentrado de Universidades', {
             align: 'center'
           });
           
-          // Restaurar el estado original
-          doc.restore();
+          doc.moveDown();
           
-          xPos += dataColWidth;
-        });
-      });
-      
-      // Columna de totales
-      doc.rect(xPos, yPos, totalColWidth, 30).stroke();
-      
-      // Filas de datos
-      yPos += 30;
-      
-      // Colores para filas alternadas
-      const rowColors = ['#ffffff', '#f9f9f9'];
-      
-      // Para cada universidad, crear una fila
-      UNIVERSITIES.forEach((uni, index) => {
-        const rowColor = rowColors[index % 2];
+          // Información del documento
+          doc.fontSize(10)
+            .text(`Fecha: ${formattedDate} | Hora: ${formattedTime}`, { align: 'right' })
+            .text(`Generado por: ${nombreUsuario}`, { align: 'right' });
+          
+          // Indicar rango de semanas en esta página
+          if (semanaGroups.length > 1) {
+            doc.fontSize(12).text(`Semanas: ${currentSemanas[0]} - ${currentSemanas[currentSemanas.length-1]} de ${semanasNum}`, {
+              align: 'center'
+            });
+          }
+          
+          doc.moveDown();
+          yPos = doc.y;
+        } else {
+          // Título para páginas adicionales
+          doc.fontSize(14).text(`Concentrado de Universidades (continuación)`, {
+            align: 'center'
+          });
+          
+          // Indicar rango de semanas en esta página
+          doc.fontSize(12).text(`Semanas: ${currentSemanas[0]} - ${currentSemanas[currentSemanas.length-1]} de ${semanasNum}`, {
+            align: 'center'
+          });
+          
+          doc.moveDown();
+          yPos = doc.y;
+        }
         
-        // Si necesitamos una nueva página
-        if (yPos > doc.page.height - 100) {
-          doc.addPage();
-          yPos = 60; // Reiniciar posición Y
+        // Calcular ancho disponible para este grupo de semanas
+        const availableWidth = pageWidth - firstColWidth - totalColWidth;
+        const dataColWidth = availableWidth / (currentSemanas.length * aniosArray.length);
+        
+        // Dibujar encabezado de la tabla
+        doc.rect(40, yPos, pageWidth, 60).fillAndStroke('#f5f5f5', '#cccccc'); // Fondo gris claro
+        
+        // Primera fila: Nombre de semanas
+        let xPos = 40 + firstColWidth;
+        doc.fontSize(8).fillColor('#000000');
+        doc.text('Universidad', 45, yPos + 15, { width: firstColWidth - 10, align: 'center' });
+        
+        // Dibujar encabezados de semanas
+        currentSemanas.forEach(semana => {
+          doc.rect(xPos, yPos, dataColWidth * aniosArray.length, 30).stroke();
+          doc.text(`S${semana}`, xPos + 2, yPos + 10, { 
+            width: dataColWidth * aniosArray.length - 4, 
+            align: 'center' 
+          });
+          xPos += dataColWidth * aniosArray.length;
+        });
+        
+        // Columna de TOTAL para esta página
+        doc.rect(xPos, yPos, totalColWidth, 30).stroke();
+        doc.text('TOTAL', xPos + 5, yPos + 10, { width: totalColWidth - 10, align: 'center' });
+        
+        // Segunda fila: Años bajo semanas
+        yPos += 30;
+        xPos = 40 + firstColWidth;
+        
+        currentSemanas.forEach(semana => {
+          aniosArray.forEach(year => {
+            doc.rect(xPos, yPos, dataColWidth, 30).stroke();
+            
+            // Guardar el estado actual
+            doc.save();
+            
+            // Mover el punto de origen al centro vertical y ligeramente a la derecha del borde izquierdo de la celda
+            doc.translate(xPos + (dataColWidth/2), yPos + 15);
+            
+            // Rotar 90 grados en sentido anti-horario
+            doc.rotate(-90);
+            
+            // Dibujar el texto con fuente más pequeña
+            doc.fontSize(7).fillColor('#000000').text(year.toString(), -10, -4, { 
+              align: 'center'
+            });
+            
+            // Restaurar el estado original
+            doc.restore();
+            
+            xPos += dataColWidth;
+          });
+        });
+        
+        // Columna de totales
+        doc.rect(xPos, yPos, totalColWidth, 30).stroke();
+        
+        // Filas de datos
+        yPos += 30;
+        
+        // Colores para filas alternadas
+        const rowColors = ['#ffffff', '#f9f9f9'];
+        
+        // Para cada universidad, crear una fila
+        UNIVERSITIES.forEach((uni, index) => {
+          const rowColor = rowColors[index % 2];
+          
+          // Si necesitamos una nueva página vertical
+          if (yPos > doc.page.height - 100) {
+            doc.addPage();
+            yPos = 60; // Reiniciar posición Y
           
           // Repetir encabezados en la nueva página
           doc.fontSize(14).text('Concentrado de Universidades (continuación)', {
@@ -542,21 +633,21 @@ app.get('/api/reportes/pdf', async (req, res) => {
         }
         
         // Fondo para la fila
-        doc.rect(40, yPos, pageWidth, 30).fill(rowColor);
-        
+        doc.rect(40, yPos, pageWidth, 25).fill(rowColor);
+          
         // Celda de universidad
-        doc.rect(40, yPos, firstColWidth, 30).stroke();
-        doc.fillColor('#000000').text(uni, 50, yPos + 10, { width: firstColWidth - 20, align: 'center' });
+        doc.rect(40, yPos, firstColWidth, 25).stroke();
+        doc.fillColor('#000000').fontSize(8).text(uni, 45, yPos + 8, { width: firstColWidth - 10, align: 'center' });
         
-        // Inicializar total de fila
-        let rowTotal = 0;
+        // Inicializar total de fila para esta página
+        let pageRowTotal = 0;
         
         // Celdas de datos
         xPos = 40 + firstColWidth;
         
-        semanasArray.forEach(semana => {
+        currentSemanas.forEach(semana => {
           aniosArray.forEach(year => {
-            doc.rect(xPos, yPos, dataColWidth, 30).stroke();
+            doc.rect(xPos, yPos, dataColWidth, 25).stroke();
             
             // Buscar valor para esta universidad, semana y año
             let value = 0;
@@ -572,38 +663,44 @@ app.get('/api/reportes/pdf', async (req, res) => {
               );
             }
             
-            // Mostrar valor
-            doc.fillColor('#000000').text(value.toString(), xPos + 5, yPos + 10, { width: dataColWidth - 10, align: 'center' });
+            // Mostrar valor con fuente más pequeña
+            doc.fillColor('#000000').fontSize(7).text(value.toString(), xPos + 2, yPos + 9, { 
+              width: dataColWidth - 4, 
+              align: 'center' 
+            });
             
-            // Sumar al total de la fila
-            rowTotal += value;
+            // Sumar al total de fila de esta página
+            pageRowTotal += value;
             
             xPos += dataColWidth;
           });
         });
         
-        // Celda de total de fila
-        doc.rect(xPos, yPos, totalColWidth, 30).fillAndStroke('#e6f7ff', '#cccccc');
-        doc.fillColor('#000000').text(rowTotal.toString(), xPos + 5, yPos + 10, { width: totalColWidth - 10, align: 'center' });
+        // Celda de total de fila para esta página
+        doc.rect(xPos, yPos, totalColWidth, 25).fillAndStroke('#e6f7ff', '#cccccc');
+        doc.fillColor('#000000').fontSize(8).text(pageRowTotal.toString(), xPos + 5, yPos + 8, { 
+          width: totalColWidth - 10, 
+          align: 'center' 
+        });
         
-        yPos += 30;
+        yPos += 25;
       });
       
       // Fila de totales
-      doc.rect(40, yPos, pageWidth, 40).fillAndStroke('#e6f7ff', '#000000');
+      doc.rect(40, yPos, pageWidth, 35).fillAndStroke('#e6f7ff', '#000000');
       doc.fillColor('#000000');
-      doc.rect(40, yPos, firstColWidth, 40).stroke();
-      doc.fontSize(12).text('Totales', 50, yPos + 15, { width: firstColWidth - 20, align: 'center' });
+      doc.rect(40, yPos, firstColWidth, 35).stroke();
+      doc.fontSize(9).text('Totales', 45, yPos + 12, { width: firstColWidth - 10, align: 'center' });
       
-      // Inicializar total general
-      let grandTotal = 0;
+      // Inicializar total general para esta página
+      let pageGrandTotal = 0;
       
-      // Celdas de totales por columna
+      // Celdas de totales por columna para este grupo de semanas
       xPos = 40 + firstColWidth;
       
-      semanasArray.forEach(semana => {
+      currentSemanas.forEach(semana => {
         aniosArray.forEach(year => {
-          doc.rect(xPos, yPos, dataColWidth, 40).stroke();
+          doc.rect(xPos, yPos, dataColWidth, 35).stroke();
           
           // Calcular total para esta semana y año
           let columnTotal = 0;
@@ -622,65 +719,72 @@ app.get('/api/reportes/pdf', async (req, res) => {
           });
           
           // Mostrar total
-          doc.fillColor('#000000').fontSize(10).text(columnTotal.toString(), xPos + 5, yPos + 10, { width: dataColWidth - 10, align: 'center' });
+          doc.fillColor('#000000').fontSize(8).text(columnTotal.toString(), xPos + 2, yPos + 10, { 
+            width: dataColWidth - 4, 
+            align: 'center' 
+          });
           
-          // Sumar al total general
-          grandTotal += columnTotal;
+          // Sumar al total general de esta página
+          pageGrandTotal += columnTotal;
           
           xPos += dataColWidth;
         });
       });
       
-      // Celda de total general
-      doc.rect(xPos, yPos, totalColWidth, 40).fillAndStroke('#e6f7ff', '#000000');
-      doc.fillColor('#000000').fontSize(12).text(grandTotal.toString(), xPos + 5, yPos + 15, { width: totalColWidth - 10, align: 'center' });
-    }
-    
-    // Numerar páginas
-    const totalPages = doc.bufferedPageRange().count;
-    for (let i = 0; i < totalPages; i++) {
-      doc.switchToPage(i);
-      doc.fontSize(8).fillColor('#000000').text(`Página ${i + 1} de ${totalPages}`, 40, doc.page.height - 40, { align: 'center' });
-    }
-    
-    // Finalizar el documento
-    doc.end();
-    
-    // Esperar a que se complete la escritura del documento
-    stream.on('finish', () => {
-      console.log(`PDF generado correctamente: ${pdfPath}`);
-      
-      // Leer el PDF generado
-      const pdfContent = fs.readFileSync(pdfPath);
-      
-      // Eliminar el archivo temporal
-      fs.unlinkSync(pdfPath);
-      
-      // Configurar encabezados para descarga
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="reporte_${Date.now()}.pdf"`);
-      
-      // Enviar el PDF
-      res.send(pdfContent);
-    });
-    
-  } catch (error) {
-    console.error('Error general generando PDF:', error);
-    
-    // Intentar eliminar el archivo si ocurrió un error
-    try {
-      if (fs.existsSync(pdfPath)) {
-        fs.unlinkSync(pdfPath);
-      }
-    } catch (unlinkError) {
-      console.error('Error al eliminar archivo en manejo de errores:', unlinkError);
-    }
-    
-    res.status(500).json({ 
-      success: false, 
-      message: 'Error al generar PDF' 
+      // Celda de total general para esta página
+      doc.rect(xPos, yPos, totalColWidth, 35).fillAndStroke('#e6f7ff', '#000000');
+      doc.fillColor('#000000').fontSize(9).text(pageGrandTotal.toString(), xPos + 5, yPos + 12, { 
+        width: totalColWidth - 10, 
+        align: 'center' 
+      });
     });
   }
+  
+  // Numerar páginas
+  const totalPages = doc.bufferedPageRange().count;
+  for (let i = 0; i < totalPages; i++) {
+    doc.switchToPage(i);
+    doc.fontSize(8).fillColor('#000000').text(`Página ${i + 1} de ${totalPages}`, 40, doc.page.height - 40, { align: 'center' });
+  }
+  
+  // Finalizar el documento
+  doc.end();
+  
+  // Esperar a que se complete la escritura del documento
+  stream.on('finish', () => {
+    console.log(`PDF generado correctamente: ${pdfPath}`);
+    
+    // Leer el PDF generado
+    const pdfContent = fs.readFileSync(pdfPath);
+    
+    // Eliminar el archivo temporal
+    fs.unlinkSync(pdfPath);
+    
+    // Configurar encabezados para descarga
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="reporte_${Date.now()}.pdf"`);
+    
+    // Enviar el PDF
+    res.send(pdfContent);
+  });
+  
+} catch (error) {
+  console.error('Error general generando PDF:', error);
+  
+  // Intentar eliminar el archivo si ocurrió un error
+  try {
+    if (fs.existsSync(pdfPath)) {
+      fs.unlinkSync(pdfPath);
+    }
+  } catch (unlinkError) {
+    console.error('Error al eliminar archivo en manejo de errores:', unlinkError);
+  }
+  
+  res.status(500).json({ 
+    success: false, 
+    message: 'Error al generar PDF' 
+  });
+}
 });
 
 const authRoutes = require('./routes/authRoutes');
@@ -694,39 +798,223 @@ app.use('/img', express.static(path.join(__dirname, '../frontend/public/img')));
 
 // Ruta principal
 app.get('/', (req, res) => {
-  res.json({ message: 'API de SIENS funcionando correctamente' });
+res.json({ message: 'API de SIENS funcionando correctamente' });
 });
 
 // Ruta de prueba para la BD
 app.get('/api/test-db', async (req, res) => {
-  try {
-    const [rows] = await db.query('SELECT * FROM tcanio LIMIT 5');
-    res.json({ success: true, data: rows });
-  } catch (error) {
-    console.error('Error en test de BD:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
+try {
+  const [rows] = await db.query('SELECT * FROM tcanio LIMIT 5');
+  res.json({ success: true, data: rows });
+} catch (error) {
+  console.error('Error en test de BD:', error);
+  res.status(500).json({ success: false, error: error.message });
+}
 });
 
 // Endpoint para universidades
 app.get('/api/universidades', async (req, res) => {
-  try {
-    const [rows] = await db.query('SELECT * FROM tcuniversidad WHERE bActivo = 1');
-    res.json(rows);
-  } catch (error) {
-    console.error('Error al obtener universidades:', error);
-    res.status(500).json({ message: 'Error interno del servidor' });
-  }
+try {
+  const [rows] = await db.query('SELECT * FROM tcuniversidad WHERE bActivo = 1');
+  res.json(rows);
+} catch (error) {
+  console.error('Error al obtener universidades:', error);
+  res.status(500).json({ message: 'Error interno del servidor' });
+}
 });
 
 // Endpoint para obtener datos de reporte por universidad
 app.get('/api/reportes/universidad/:idUniversidad', async (req, res) => {
-  try {
-    const { idUniversidad } = req.params;
-    const anios = req.query.anios ? (Array.isArray(req.query.anios) ? req.query.anios : [req.query.anios]) : [];
-    const semanas = req.query.semanas || 10;
+try {
+  const { idUniversidad } = req.params;
+  const anios = req.query.anios ? (Array.isArray(req.query.anios) ? req.query.anios : [req.query.anios]) : [];
+  const semanas = req.query.semanas || 10;
+  
+  console.log(`Obteniendo reporte para universidad ${idUniversidad}, años:`, anios, 'semanas:', semanas);
+  
+  // Consulta para las fichas de esta universidad
+  const [fichas] = await db.query(
+    `SELECT 
+      f.iIdFicha, f.iIdUniversidad, f.iIdCarrera, f.iIdBachillerato,
+      f.iIdAnio, a.cAnio as anio, 
+      f.iIdSemana, s.iNumeroSemana as semana,
+      f.iHombre, f.iMujer, f.iCantidad 
+    FROM 
+      tdficha f
+      JOIN tcanio a ON f.iIdAnio = a.iIdAnio
+      JOIN tcsemana s ON f.iIdSemana = s.iIdSemana
+    WHERE 
+      f.iIdUniversidad = ?
+      AND s.iNumeroSemana <= ?
+    ORDER BY 
+      a.cAnio, s.iNumeroSemana`,
+    [idUniversidad, semanas]
+  );
+  
+  // Procesar datos para formato esperado por el frontend
+  const reporteData = {
+    regular: [],
+    acumulado: []
+  };
+  
+  // Mapa para rastrear acumulados por año
+  const acumuladosPorAnio = {};
+  
+  // Procesar filas de resultados
+  fichas.forEach(ficha => {
+    const anioNum = parseInt(ficha.anio);
     
-    console.log(`Obteniendo reporte para universidad ${idUniversidad}, años:`, anios, 'semanas:', semanas);
+    // Datos regulares
+    reporteData.regular.push({
+      semana: ficha.semana,
+      anio: anioNum,
+      cantidad: ficha.iCantidad
+    });
+    
+    // Inicializar acumulado para este año si no existe
+    if (!acumuladosPorAnio[anioNum]) {
+      acumuladosPorAnio[anioNum] = 0;
+    }
+    
+    // Calcular acumulado
+    acumuladosPorAnio[anioNum] += ficha.iCantidad;
+    
+    // Datos acumulados
+    reporteData.acumulado.push({
+      semana: ficha.semana,
+      anio: anioNum,
+      cantidad: ficha.iCantidad,
+      acumulado: acumuladosPorAnio[anioNum]
+    });
+  });
+  
+  res.json(reporteData);
+} catch (error) {
+  console.error(`Error al obtener reporte para universidad ${req.params.idUniversidad}:`, error);
+  res.status(500).json({ message: 'Error interno del servidor' });
+}
+});
+
+// Endpoint para login
+app.post('/api/auth/login', async (req, res) => {
+try {
+  const { email, password } = req.body;
+  console.log('Intento de login con:', { email });
+  
+  let user = null;
+  
+  // Primero intentamos buscar por correo electrónico
+  const [usersByEmail] = await db.query(
+    `SELECT u.*, d.cCorreo, d.cNombreCompleto 
+     FROM tdusuario u
+     LEFT JOIN tddetallesusuario d ON u.iIdUsuario = d.iIdUsuario
+     WHERE d.cCorreo = ?`,
+    [email]
+  );
+  
+  // Si no encontramos usuario por correo, intentamos por nombre de usuario
+  if (usersByEmail.length === 0) {
+    console.log('Usuario no encontrado por correo, buscando por nombre de usuario');
+    
+    const [usersByUsername] = await db.query(
+      `SELECT u.*, d.cCorreo, d.cNombreCompleto 
+       FROM tdusuario u
+       LEFT JOIN tddetallesusuario d ON u.iIdUsuario = d.iIdUsuario
+       WHERE u.cNombreUsuario = ?`,
+      [email]
+    );
+    
+    if (usersByUsername.length === 0) {
+      console.log('Usuario no encontrado');
+      return res.status(401).json({ 
+        message: 'Credenciales incorrectas' 
+      });
+    }
+    
+    user = usersByUsername[0];
+  } else {
+    user = usersByEmail[0];
+  }
+  
+  // Verificar la contraseña
+  if (user.cContraseña !== password) {
+    console.log('Contraseña incorrecta');
+    return res.status(401).json({ 
+      message: 'Credenciales incorrectas' 
+    });
+  }
+  
+  // Obtener el rol del usuario
+  const [roles] = await db.query(
+    'SELECT r.cNombreRol FROM tcrol r WHERE r.iIdRol = ?',
+    [user.iIdRol]
+  );
+  
+  const roleName = roles.length > 0 ? roles[0].cNombreRol : 'Usuario';
+  
+  // Login exitoso - enviar información del usuario
+  console.log('Login exitoso para usuario:', user.cNombreUsuario);
+  
+  // Protección contra propiedades posiblemente indefinidas
+  const safeResponse = {
+    user: {
+      iIdUsuario: user.iIdUsuario,
+      cNombreUsuario: user.cNombreUsuario || '',
+      cNombreCompleto: user.cNombreCompleto || '',
+      cCorreo: user.cCorreo || '',
+      iIdRol: user.iIdRol || null,
+      nombreRol: roleName || 'Usuario',
+      iIdUniversidad: user.iIdUniversidad || null
+    }
+  };
+  
+  // Si existe cImagen, añadirla al objeto de respuesta con la ruta completa
+  if (user.cImagen) {
+    // Ensure we're using HTTPS for production
+    const baseUrl = process.env.API_URL || 'https://siens-api-production.up.railway.app';
+    
+    // Properly format the image URL
+    if (user.cImagen.startsWith('http://') || user.cImagen.startsWith('https://')) {
+      // Force HTTPS for security
+      safeResponse.user.cImagen = user.cImagen.replace(/^http:\/\//i, 'https://');
+    } 
+    else if (user.cImagen.startsWith('/img/')) {
+      safeResponse.user.cImagen = `${baseUrl}${user.cImagen}`;
+    }
+    else {
+      safeResponse.user.cImagen = `${baseUrl}/img/${user.cImagen}`;
+    }
+    
+    console.log('URL de imagen generada:', safeResponse.user.cImagen);
+  }
+  
+  res.status(200).json(safeResponse);
+} catch (error) {
+  console.error('Error en login:', error);
+  res.status(500).json({ 
+    message: 'Error interno del servidor' 
+  });
+}
+});
+
+// Endpoint para obtener datos de todas las universidades
+app.get('/api/reportes/todas', async (req, res) => {
+try {
+  const anios = req.query.anios ? (Array.isArray(req.query.anios) ? req.query.anios : [req.query.anios]) : [];
+  const semanas = req.query.semanas || 10;
+  
+  console.log(`Obteniendo reporte para todas las universidades, años:`, anios, 'semanas:', semanas);
+  
+  // Primero obtenemos todas las universidades activas
+  const [universidades] = await db.query('SELECT iIdUniversidad, cNombreCorto FROM tcuniversidad WHERE bActivo = 1');
+  
+  // Objeto para almacenar resultados por universidad
+  const resultados = {};
+  
+  // Para cada universidad, obtenemos sus datos
+  for (const universidad of universidades) {
+    const universidadId = universidad.iIdUniversidad;
+    const nombreCorto = universidad.cNombreCorto;
     
     // Consulta para las fichas de esta universidad
     const [fichas] = await db.query(
@@ -744,11 +1032,11 @@ app.get('/api/reportes/universidad/:idUniversidad', async (req, res) => {
         AND s.iNumeroSemana <= ?
       ORDER BY 
         a.cAnio, s.iNumeroSemana`,
-      [idUniversidad, semanas]
+      [universidadId, semanas]
     );
     
-    // Procesar datos para formato esperado por el frontend
-    const reporteData = {
+    // Procesar datos para esta universidad
+    const universidadData = {
       regular: [],
       acumulado: []
     };
@@ -761,7 +1049,7 @@ app.get('/api/reportes/universidad/:idUniversidad', async (req, res) => {
       const anioNum = parseInt(ficha.anio);
       
       // Datos regulares
-      reporteData.regular.push({
+      universidadData.regular.push({
         semana: ficha.semana,
         anio: anioNum,
         cantidad: ficha.iCantidad
@@ -776,7 +1064,7 @@ app.get('/api/reportes/universidad/:idUniversidad', async (req, res) => {
       acumuladosPorAnio[anioNum] += ficha.iCantidad;
       
       // Datos acumulados
-      reporteData.acumulado.push({
+      universidadData.acumulado.push({
         semana: ficha.semana,
         anio: anioNum,
         cantidad: ficha.iCantidad,
@@ -784,210 +1072,26 @@ app.get('/api/reportes/universidad/:idUniversidad', async (req, res) => {
       });
     });
     
-    res.json(reporteData);
-  } catch (error) {
-    console.error(`Error al obtener reporte para universidad ${req.params.idUniversidad}:`, error);
-    res.status(500).json({ message: 'Error interno del servidor' });
+    // Guardar resultados de esta universidad
+    resultados[nombreCorto] = universidadData;
   }
-});
-
-// Endpoint para login
-app.post('/api/auth/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    console.log('Intento de login con:', { email });
-    
-    let user = null;
-    
-    // Primero intentamos buscar por correo electrónico
-    const [usersByEmail] = await db.query(
-      `SELECT u.*, d.cCorreo, d.cNombreCompleto 
-       FROM tdusuario u
-       LEFT JOIN tddetallesusuario d ON u.iIdUsuario = d.iIdUsuario
-       WHERE d.cCorreo = ?`,
-      [email]
-    );
-    
-    // Si no encontramos usuario por correo, intentamos por nombre de usuario
-    if (usersByEmail.length === 0) {
-      console.log('Usuario no encontrado por correo, buscando por nombre de usuario');
-      
-      const [usersByUsername] = await db.query(
-        `SELECT u.*, d.cCorreo, d.cNombreCompleto 
-         FROM tdusuario u
-         LEFT JOIN tddetallesusuario d ON u.iIdUsuario = d.iIdUsuario
-         WHERE u.cNombreUsuario = ?`,
-        [email]
-      );
-      
-      if (usersByUsername.length === 0) {
-        console.log('Usuario no encontrado');
-        return res.status(401).json({ 
-          message: 'Credenciales incorrectas' 
-        });
-      }
-      
-      user = usersByUsername[0];
-    } else {
-      user = usersByEmail[0];
-    }
-    
-    // Verificar la contraseña
-    if (user.cContraseña !== password) {
-      console.log('Contraseña incorrecta');
-      return res.status(401).json({ 
-        message: 'Credenciales incorrectas' 
-      });
-    }
-    
-    // Obtener el rol del usuario
-    const [roles] = await db.query(
-      'SELECT r.cNombreRol FROM tcrol r WHERE r.iIdRol = ?',
-      [user.iIdRol]
-    );
-    
-    const roleName = roles.length > 0 ? roles[0].cNombreRol : 'Usuario';
-    
-    // Login exitoso - enviar información del usuario
-    console.log('Login exitoso para usuario:', user.cNombreUsuario);
-    
-    // Protección contra propiedades posiblemente indefinidas
-    const safeResponse = {
-      user: {
-        iIdUsuario: user.iIdUsuario,
-        cNombreUsuario: user.cNombreUsuario || '',
-        cNombreCompleto: user.cNombreCompleto || '',
-        cCorreo: user.cCorreo || '',
-        iIdRol: user.iIdRol || null,
-        nombreRol: roleName || 'Usuario',
-        iIdUniversidad: user.iIdUniversidad || null
-      }
-    };
-    
-    // Si existe cImagen, añadirla al objeto de respuesta con la ruta completa
-    if (user.cImagen) {
-      // Ensure we're using HTTPS for production
-      const baseUrl = process.env.API_URL || 'https://siens-api-production.up.railway.app';
-      
-      // Properly format the image URL
-      if (user.cImagen.startsWith('http://') || user.cImagen.startsWith('https://')) {
-        // Force HTTPS for security
-        safeResponse.user.cImagen = user.cImagen.replace(/^http:\/\//i, 'https://');
-      } 
-      else if (user.cImagen.startsWith('/img/')) {
-        safeResponse.user.cImagen = `${baseUrl}${user.cImagen}`;
-      }
-      else {
-        safeResponse.user.cImagen = `${baseUrl}/img/${user.cImagen}`;
-      }
-      
-      console.log('URL de imagen generada:', safeResponse.user.cImagen);
-    }
-    
-    res.status(200).json(safeResponse);
-  } catch (error) {
-    console.error('Error en login:', error);
-    res.status(500).json({ 
-      message: 'Error interno del servidor' 
-    });
-  }
-});
-
-// Endpoint para obtener datos de todas las universidades
-app.get('/api/reportes/todas', async (req, res) => {
-  try {
-    const anios = req.query.anios ? (Array.isArray(req.query.anios) ? req.query.anios : [req.query.anios]) : [];
-    const semanas = req.query.semanas || 10;
-    
-    console.log(`Obteniendo reporte para todas las universidades, años:`, anios, 'semanas:', semanas);
-    
-    // Primero obtenemos todas las universidades activas
-    const [universidades] = await db.query('SELECT iIdUniversidad, cNombreCorto FROM tcuniversidad WHERE bActivo = 1');
-    
-    // Objeto para almacenar resultados por universidad
-    const resultados = {};
-    
-    // Para cada universidad, obtenemos sus datos
-    for (const universidad of universidades) {
-      const universidadId = universidad.iIdUniversidad;
-      const nombreCorto = universidad.cNombreCorto;
-      
-      // Consulta para las fichas de esta universidad
-      const [fichas] = await db.query(
-        `SELECT 
-          f.iIdFicha, f.iIdUniversidad, f.iIdCarrera, f.iIdBachillerato,
-          f.iIdAnio, a.cAnio as anio, 
-          f.iIdSemana, s.iNumeroSemana as semana,
-          f.iHombre, f.iMujer, f.iCantidad 
-        FROM 
-          tdficha f
-          JOIN tcanio a ON f.iIdAnio = a.iIdAnio
-          JOIN tcsemana s ON f.iIdSemana = s.iIdSemana
-        WHERE 
-          f.iIdUniversidad = ?
-          AND s.iNumeroSemana <= ?
-        ORDER BY 
-          a.cAnio, s.iNumeroSemana`,
-        [universidadId, semanas]
-      );
-      
-      // Procesar datos para esta universidad
-      const universidadData = {
-        regular: [],
-        acumulado: []
-      };
-      
-      // Mapa para rastrear acumulados por año
-      const acumuladosPorAnio = {};
-      
-      // Procesar filas de resultados
-      fichas.forEach(ficha => {
-        const anioNum = parseInt(ficha.anio);
-        
-        // Datos regulares
-        universidadData.regular.push({
-          semana: ficha.semana,
-          anio: anioNum,
-          cantidad: ficha.iCantidad
-        });
-        
-        // Inicializar acumulado para este año si no existe
-        if (!acumuladosPorAnio[anioNum]) {
-          acumuladosPorAnio[anioNum] = 0;
-        }
-        
-        // Calcular acumulado
-        acumuladosPorAnio[anioNum] += ficha.iCantidad;
-        
-        // Datos acumulados
-        universidadData.acumulado.push({
-          semana: ficha.semana,
-          anio: anioNum,
-          cantidad: ficha.iCantidad,
-          acumulado: acumuladosPorAnio[anioNum]
-        });
-      });
-      
-      // Guardar resultados de esta universidad
-      resultados[nombreCorto] = universidadData;
-    }
-    
-    res.json(resultados);
-  } catch (error) {
-    console.error(`Error al obtener reporte para todas las universidades:`, error);
-    res.status(500).json({ message: 'Error interno del servidor' });
-  }
+  
+  res.json(resultados);
+} catch (error) {
+  console.error(`Error al obtener reporte para todas las universidades:`, error);
+  res.status(500).json({ message: 'Error interno del servidor' });
+}
 });
 
 app.use('/api/auth', authRoutes);
 
 // Manejador de errores global
 app.use((err, req, res, next) => {
-  console.error('Error no capturado:', err);
-  res.status(500).json({
-    message: 'Error interno del servidor',
-    error: process.env.NODE_ENV === 'development' ? err.message : undefined
-  });
+console.error('Error no capturado:', err);
+res.status(500).json({
+  message: 'Error interno del servidor',
+  error: process.env.NODE_ENV === 'development' ? err.message : undefined
+});
 });
 
 // Exportar la app
