@@ -72,7 +72,7 @@ const login = asyncHandler(async (req, res) => {
   // 5) Procesar la URL de la imagen si existe
   let imageUrl = user.cImagen;
   if (imageUrl) {
-    const baseUrl = process.env.API_URL || 'https://siens-api-production.up.railway.app';
+    const baseUrl = process.env.API_URL || 'https://sies-image-server.onrender.com/';
     
     // Formatear correctamente la URL de la imagen
     if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
