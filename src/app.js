@@ -554,16 +554,20 @@ app.get('/api/reportes/pdf', async (req, res) => {
         const firstColWidth = 60; // Ancho de la primera columna (universidades)
         const totalColWidth = 60; // Ancho de la columna de totales (solo en última página)
         
-        // Ancho disponible diferente si es la última página (con columna de totales)
+        // Calcular el ancho total de la tabla para esta página
+        const tableWidth = isLastPage 
+          ? pageWidth  // En la última página, incluye la columna de totales
+          : pageWidth; // En páginas intermedias, ocupa todo el ancho disponible
+        
+        // Ancho disponible para datos (semanas)
         const availableWidth = isLastPage 
-          ? pageWidth - firstColWidth - totalColWidth
-          : pageWidth - firstColWidth;
+          ? pageWidth - firstColWidth - totalColWidth // Reservar espacio para totales en última página
+          : pageWidth - firstColWidth;                // Usar todo el espacio en páginas intermedias
         
         const dataColWidth = availableWidth / (currentSemanas.length * aniosArray.length);
         
-        // Dibujar encabezado de la tabla
-        const headerWidth = isLastPage ? pageWidth : pageWidth - totalColWidth;
-        doc.rect(40, yPos, headerWidth, 60).fillAndStroke('#f5f5f5', '#cccccc'); // Fondo gris claro
+        // Dibujar encabezado de la tabla (el fondo gris cubre toda la tabla)
+        doc.rect(40, yPos, tableWidth, 60).fillAndStroke('#f5f5f5', '#cccccc');
         
         // Primera fila: Nombre de semanas
         let xPos = 40 + firstColWidth;
@@ -627,11 +631,8 @@ app.get('/api/reportes/pdf', async (req, res) => {
             // Aquí se implementaría la repetición de encabezados para continuación vertical si es necesario
           }
           
-          // Calcular ancho de la fila (con o sin totales)
-          const rowWidth = isLastPage ? pageWidth : pageWidth - totalColWidth;
-          
-          // Fondo para la fila
-          doc.rect(40, yPos, rowWidth, 25).fill(rowColor);
+          // Fondo para la fila (cubre todo el ancho de la tabla)
+          doc.rect(40, yPos, tableWidth, 25).fill(rowColor);
           
           // Celda de universidad
           doc.rect(40, yPos, firstColWidth, 25).stroke();
@@ -686,9 +687,8 @@ app.get('/api/reportes/pdf', async (req, res) => {
           yPos += 25;
         });
         
-        // Fila de totales
-        const totalsRowWidth = isLastPage ? pageWidth : pageWidth - totalColWidth;
-        doc.rect(40, yPos, totalsRowWidth, 35).fillAndStroke('#e6f7ff', '#000000');
+        // Fila de totales (fondo azul para toda la fila)
+        doc.rect(40, yPos, tableWidth, 35).fillAndStroke('#e6f7ff', '#000000');
         doc.fillColor('#000000');
         doc.rect(40, yPos, firstColWidth, 35).stroke();
         doc.fontSize(9).text('Totales', 45, yPos + 12, { width: firstColWidth - 10, align: 'center' });
