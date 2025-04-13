@@ -125,7 +125,7 @@ app.get('/api/reportes/pdf', async (req, res) => {
     doc.moveDown();
     
     // Información del documento
-    doc.fontSize(10)
+    doc.fontSize(tableFontSize)
       .text(`Fecha: ${formattedDate} | Hora: ${formattedTime}`, { align: 'right' })
       .text(`Generado por: ${nombreUsuario}`, { align: 'right' });
     
@@ -150,9 +150,13 @@ app.get('/api/reportes/pdf', async (req, res) => {
       
       // Calcular ancho de las columnas
       const pageWidth = doc.page.width - 80; // 40px de margen en cada lado
-      const firstColWidth = 80; // Ancho de la primera columna (semanas)
-      const totalColWidth = 80; // Ancho de la columna de totales
-      const dataColWidth = (pageWidth - firstColWidth - totalColWidth) / (UNIVERSITIES.length * aniosArray.length);
+      const firstColWidth = 60; // Reducir de 80 a 60 (Ancho de la primera columna - semanas)
+      const totalColWidth = 60; // Reducir de 80 a 60 (Ancho de la columna de totales)
+      const remainingWidth = pageWidth - firstColWidth - totalColWidth;
+      const dataColWidth = remainingWidth / (UNIVERSITIES.length * aniosArray.length);
+
+      // Reducir el tamaño de la fuente para todos los textos de la tabla
+      const tableFontSize = 8; // Reducir de 10 a 8
       
       // Posición vertical actual
       let yPos = doc.y;
@@ -162,7 +166,7 @@ app.get('/api/reportes/pdf', async (req, res) => {
       
       // Primera fila: Nombre de universidades
       let xPos = 40 + firstColWidth;
-      doc.fontSize(10).fillColor('#000000');
+      doc.fontSize(tableFontSize).fillColor('#000000');
       doc.text('Semana', 50, yPos + 15, { width: firstColWidth - 20, align: 'center' });
       
       // Dibujar logos de universidades
@@ -232,7 +236,7 @@ app.get('/api/reportes/pdf', async (req, res) => {
           
           // Primera fila: Nombre de universidades
           let xHeader = 40 + firstColWidth;
-          doc.fontSize(10).fillColor('#000000');
+          doc.fontSize(tableFontSize).fillColor('#000000');
           doc.text('Semana', 50, yPos + 15, { width: firstColWidth - 20, align: 'center' });
           
           // Dibujar logos de universidades
@@ -300,7 +304,10 @@ app.get('/api/reportes/pdf', async (req, res) => {
             }
             
             // Mostrar valor
-            doc.text(value.toString(), xPos + 5, yPos + 10, { width: dataColWidth - 10, align: 'center' });
+            doc.text(value.toString(), xPos + 1, yPos + 5, { 
+              width: dataColWidth - 2, 
+              align: 'center' 
+            });
             
             // Sumar al total de la fila
             rowTotal += value;
@@ -351,7 +358,7 @@ app.get('/api/reportes/pdf', async (req, res) => {
           }
           
           // Mostrar total
-          doc.fontSize(10)
+          doc.fontSize(tableFontSize)
           .fillColor('#000000')
           .text(columnTotal.toString(), xPos + 5, yPos + 10, { width: dataColWidth - 10, align: 'center' });
           
@@ -400,9 +407,14 @@ app.get('/api/reportes/pdf', async (req, res) => {
       
       // Calcular ancho de las columnas
       const pageWidth = doc.page.width - 80; // 40px de margen en cada lado
-      const firstColWidth = 120; // Ancho de la primera columna (universidades)
-      const totalColWidth = 80; // Ancho de la columna de totales
-      const dataColWidth = (pageWidth - firstColWidth - totalColWidth) / (semanasArray.length * aniosArray.length);
+      const firstColWidth = 80; // Reducir de 120 a 80 (Ancho de la primera columna - universidades)
+      const totalColWidth = 60; // Reducir de 80 a 60 (Ancho de la columna de totales)
+      const remainingWidth = pageWidth - firstColWidth - totalColWidth;
+      const yearColWidth = 12; // Ancho estrecho para las columnas de años
+      const dataColWidth = remainingWidth / (semanasArray.length * aniosArray.length);
+
+      // Reducir el tamaño de la fuente para todos los textos de la tabla
+      const tableFontSize = 8; // Reducir a 8
       
       // Posición vertical actual
       let yPos = doc.y;
@@ -412,7 +424,7 @@ app.get('/api/reportes/pdf', async (req, res) => {
       
       // Primera fila: Nombre de semanas
       let xPos = 40 + firstColWidth;
-      doc.fontSize(10).fillColor('#000000');
+      doc.fontSize(tableFontSize).fillColor('#000000');
       doc.text('Universidad', 50, yPos + 15, { width: firstColWidth - 20, align: 'center' });
       
       // Dibujar encabezados de semanas
@@ -488,7 +500,7 @@ app.get('/api/reportes/pdf', async (req, res) => {
           
           // Primera fila: Nombre de semanas
           let xHeader = 40 + firstColWidth;
-          doc.fontSize(10).fillColor('#000000');
+          doc.fontSize(tableFontSize).fillColor('#000000');
           doc.text('Universidad', 50, yPos + 15, { width: firstColWidth - 20, align: 'center' });
           
           // Dibujar encabezados de semanas
