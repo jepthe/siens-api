@@ -72,7 +72,7 @@ app.get("/api/reportes/pdf", async (req, res) => {
     
     // Objeto para almacenar los buffers de imágenes
     const imageBuffers = {
-      pdfLogo: await downloadImage()
+     
     };
     
     // Descargar logos de universidades
