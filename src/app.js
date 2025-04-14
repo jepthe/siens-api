@@ -6,7 +6,7 @@ const db = require("./config/db");
 
 require("dotenv").config();
 const PRODUCTION_URL =
-  process.env.API_URL || "https://sies-image-server.onrender.com/"; //por si no se define la variable de entorno, resuelve imagen perfil
+  process.env.API_URL || "https://sies-image-server.onrender.com"; //por si no se define la variable de entorno, resuelve imagen perfil
 
 const app = express();
 
@@ -1197,7 +1197,7 @@ app.post("/api/auth/login", async (req, res) => {
     if (user.cImagen) {
       // Ensure we're using HTTPS for production
       const baseUrl =
-        process.env.API_URL || "https://sies-image-server.onrender.com/";
+        process.env.API_URL || "https://sies-image-server.onrender.com";
 
       // Properly format the image URL
       if (
