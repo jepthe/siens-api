@@ -3,6 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const db = require("./config/db");
+const axios = require('axios');
 
 require("dotenv").config();
 const PRODUCTION_URL =
@@ -27,6 +28,75 @@ if (!fs.existsSync(tmpDir)) {
 
 // Configurar ruta para servir archivos PDF temporales
 app.use("/tmp", express.static(path.join(__dirname, "../tmp")));
+
+// Define la URL base del servidor de imágenes
+const IMAGE_SERVER_URL = process.env.IMAGE_SERVER_URL || 'https://sies-image-server.onrender.com';
+
+// Función para descargar una imagen y guardarla temporalmente
+async function downloadImage(imageUrl, localPath) {
+  try {
+    // Asegúrate de que el directorio existe
+    const dir = path.dirname(localPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    
+    console.log(`Descargando imagen desde: ${imageUrl}`);
+    
+    // Descargar la imagen
+    const response = await axios({
+      method: 'GET',
+      url: imageUrl,
+      responseType: 'arraybuffer'
+    });
+    
+    // Guardar la imagen en el sistema de archivos local
+    fs.writeFileSync(localPath, response.data);
+    
+    return localPath;
+  } catch (error) {
+    console.error(`Error descargando imagen ${imageUrl}:`, error.message);
+    return null;
+  }
+}
+
+// Función para preparar las imágenes necesarias para el PDF
+async function prepareImagesForPDF() {
+  // Objeto para almacenar las rutas locales de las imágenes descargadas
+  const universityImages = {};
+  
+  // Asegúrate de que el directorio tmp/img existe
+  const tmpImgDir = path.join(tmpDir, 'img');
+  if (!fs.existsSync(tmpImgDir)) {
+    fs.mkdirSync(tmpImgDir, { recursive: true });
+  }
+  
+  // Mapeo de nombres de universidades a URLs de imágenes
+  const universityImageUrls = {
+    'UPQ': `${IMAGE_SERVER_URL}/img/universidades/LOGO_UPQ.png`,
+    'UPSRJ': `${IMAGE_SERVER_URL}/img/universidades/LOGO_UPSRJ.png`,
+    'UTEQ': `${IMAGE_SERVER_URL}/img/universidades/LOGO_UTEQ.png`,
+    'UTC': `${IMAGE_SERVER_URL}/img/universidades/LOGO_UTC.png`,
+    'UTSJR': `${IMAGE_SERVER_URL}/img/universidades/LOGO_UTSJR.png`,
+    'UNAQ': `${IMAGE_SERVER_URL}/img/universidades/LOGO_UNAQ.png`
+  };
+  
+  // Descargar las imágenes de las universidades
+  for (const [uni, url] of Object.entries(universityImageUrls)) {
+    const localPath = path.join(tmpImgDir, `LOGO_${uni}.png`);
+    const downloadedPath = await downloadImage(url, localPath);
+    if (downloadedPath) {
+      universityImages[uni] = downloadedPath;
+    }
+  }
+  
+  // Descargar también el logo principal
+  const logoUrl = `${IMAGE_SERVER_URL}/img/general/LOGO_pdf.png`;
+  const logoLocalPath = path.join(tmpImgDir, 'LOGO_pdf.png');
+  const logoPath = await downloadImage(logoUrl, logoLocalPath);
+  
+  return { universityImages, logoPath };
+}
 
 // Endpoint para generar PDF
 // Solución completa para el endpoint de generación de PDF
@@ -142,58 +212,26 @@ app.get("/api/reportes/pdf", async (req, res) => {
       ).padStart(2, "0")}`;
     }
 
-    // Mapeo de nombres de universidades a sus logos
-    const universityImages = {
-      UPQ: path.join(
-        __dirname,
-        "https://sies-image-server.onrender.com/frontend/public/img/universidades/LOGO_UPQ.png"
-      ),
-      UPSRJ: path.join(
-        __dirname,
-        "https://sies-image-server.onrender.com/frontend/public/img/universidades/LOGO_UPSRJ.png"
-      ),
-      UTEQ: path.join(
-        __dirname,
-        "https://sies-image-server.onrender.com/frontend/public/img/universidades/LOGO_UTEQ.png"
-      ),
-      UTC: path.join(
-        __dirname,
-        "https://sies-image-server.onrender.com/frontend/public/img/universidades/LOGO_UTC.png"
-      ),
-      UTSJR: path.join(
-        __dirname,
-        "https://sies-image-server.onrender.com/frontend/public/img/universidades/LOGO_UTSJR.png"
-      ),
-      UNAQ: path.join(
-        __dirname,
-        "https://sies-image-server.onrender.com/frontend/public/img/universidades/LOGO_UNAQ.png"
-      ),
-    };
+    // Preparar imágenes desde el servidor remoto
+    const { universityImages, logoPath } = await prepareImagesForPDF();
 
     // Generar PDF según el tipo de vista
     if (formatoVista === "bySemana") {
       // Para cada página de un PDF, añadir encabezado común con logo
-      const addCommonHeader = (isFirstPage = false) => {
+      const addCommonHeader = async (isFirstPage = false) => {
         // Añadir el logo en la esquina superior izquierda (solo primera página)
-        if (isFirstPage) {
+        if (isFirstPage && logoPath && fs.existsSync(logoPath)) {
           try {
-            const logoPath = path.join(
-              __dirname,
-              "../frontend/public/img/general/LOGO_pdf.png"
+            doc.image(
+              logoPath,
+              50, // margen izquierdo
+              50, // margen superior
+              {
+                fit: [100, 50],
+                align: "left",
+                valign: "top",
+              }
             );
-
-            if (fs.existsSync(logoPath)) {
-              doc.image(
-                logoPath,
-                50, // margen izquierdo
-                50, // margen superior
-                {
-                  fit: [100, 50],
-                  align: "left",
-                  valign: "top",
-                }
-              );
-            }
           } catch (logoError) {
             console.error("Error al añadir el logo al PDF:", logoError);
           }
@@ -225,7 +263,7 @@ app.get("/api/reportes/pdf", async (req, res) => {
       };
 
       // Añadir encabezado común para la primera página
-      addCommonHeader(true);
+      await addCommonHeader(true);
 
       // *** VISTA POR SEMANA: Crear tabla optimizada en una sola página ***
 
@@ -649,23 +687,14 @@ app.get("/api/reportes/pdf", async (req, res) => {
         // Añadir encabezado con logo para la primera página
         if (pageIndex === 0) {
           try {
-            const logoPath = path.join(
-              __dirname,
-              "../frontend/public/img/general/LOGO_pdf.png"
-            );
-
-            if (fs.existsSync(logoPath)) {
-              doc.image(
-                logoPath,
-                50, // margen izquierdo
-                50, // margen superior
-                {
-                  fit: [100, 50],
-                  align: "left",
-                  valign: "top",
-                }
-              );
-            }
+            // Cuando necesite mostrar el logo en la primera página:
+      if (logoPath && fs.existsSync(logoPath)) {
+        doc.image(logoPath, 50, 50, {
+          fit: [100, 50],
+          align: "left",
+          valign: "top",
+        });
+      }
           } catch (logoError) {
             console.error("Error al añadir el logo al PDF:", logoError);
           }
@@ -963,6 +992,27 @@ app.get("/api/reportes/pdf", async (req, res) => {
 
       // Eliminar el archivo temporal
       fs.unlinkSync(pdfPath);
+
+      // Eliminar las imágenes temporales
+      if (universityImages) {
+        Object.values(universityImages).forEach((imgPath) => {
+          if (fs.existsSync(imgPath)) {
+            try {
+              fs.unlinkSync(imgPath);
+            } catch (err) {
+              console.error(`Error al eliminar imagen temporal: ${imgPath}`, err);
+            }
+          }
+        });
+      }
+      
+      if (logoPath && fs.existsSync(logoPath)) {
+        try {
+          fs.unlinkSync(logoPath);
+        } catch (err) {
+          console.error(`Error al eliminar logo temporal: ${logoPath}`, err);
+        }
+      }
 
       // Configurar encabezados para descarga
       res.setHeader("Content-Type", "application/pdf");
