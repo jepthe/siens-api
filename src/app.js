@@ -71,9 +71,9 @@ app.get("/api/reportes/pdf", async (req, res) => {
     console.log("Descargando imágenes...");
     
     // Objeto para almacenar los buffers de imágenes
-    /*const imageBuffers = {
-      pdfLogo: await downloadImage(pdfLogoUrl)
-    };*/
+    const imageBuffers = {
+      pdfLogo: await downloadImage()
+    };
     
     // Descargar logos de universidades
     for (const [uni, url] of Object.entries(universityImageUrls)) {
