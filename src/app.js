@@ -52,7 +52,7 @@ app.get("/api/reportes/pdf", async (req, res) => {
     };
     
     // URL para el logo del PDF
-    const pdfLogoUrl = `${IMAGE_SERVER_URL}/img/general/LOGO_pdf.png`;
+    //const pdfLogoUrl = `${IMAGE_SERVER_URL}/img/general/LOGO_pdf.png`;
     
     // Función para descargar imagen
     const downloadImage = async (url) => {
@@ -71,9 +71,9 @@ app.get("/api/reportes/pdf", async (req, res) => {
     console.log("Descargando imágenes...");
     
     // Objeto para almacenar los buffers de imágenes
-    const imageBuffers = {
+    /*const imageBuffers = {
       pdfLogo: await downloadImage(pdfLogoUrl)
-    };
+    };*/
     
     // Descargar logos de universidades
     for (const [uni, url] of Object.entries(universityImageUrls)) {
