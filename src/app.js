@@ -1,4 +1,5 @@
 // src/app.js
+const axios = require('axios');
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
@@ -37,6 +38,48 @@ app.get("/api/reportes/pdf", async (req, res) => {
   const pdfPath = path.join(tmpDir, pdfFileName);
 
   try {
+    // Configuración de la URL base del servidor de imágenes
+    const IMAGE_SERVER_URL = process.env.IMAGE_SERVER_URL || "https://sies-image-server.onrender.com";
+    
+    // Mapeo de nombres de universidades a sus URLs
+    const universityImageUrls = {
+      UPQ: `${IMAGE_SERVER_URL}/img/universidades/LOGO_UPQ.png`,
+      UPSRJ: `${IMAGE_SERVER_URL}/img/universidades/LOGO_UPSRJ.png`,
+      UTEQ: `${IMAGE_SERVER_URL}/img/universidades/LOGO_UTEQ.png`,
+      UTC: `${IMAGE_SERVER_URL}/img/universidades/LOGO_UTC.png`,
+      UTSJR: `${IMAGE_SERVER_URL}/img/universidades/LOGO_UTSJR.png`,
+      UNAQ: `${IMAGE_SERVER_URL}/img/universidades/LOGO_UNAQ.png`
+    };
+    
+    // URL para el logo del PDF
+    const pdfLogoUrl = `${IMAGE_SERVER_URL}/img/general/LOGO_pdf.png`;
+    
+    // Función para descargar imagen
+    const downloadImage = async (url) => {
+      try {
+        const response = await axios.get(url, {
+          responseType: 'arraybuffer'
+        });
+        return Buffer.from(response.data, 'binary');
+      } catch (error) {
+        console.error('Error descargando imagen:', url, error.message);
+        return null;
+      }
+    };
+    
+    // Descargar todas las imágenes necesarias al inicio
+    console.log("Descargando imágenes...");
+    
+    // Objeto para almacenar los buffers de imágenes
+    const imageBuffers = {
+      pdfLogo: await downloadImage(pdfLogoUrl)
+    };
+    
+    // Descargar logos de universidades
+    for (const [uni, url] of Object.entries(universityImageUrls)) {
+      imageBuffers[uni] = await downloadImage(url);
+      console.log(`Imagen de ${uni} ${imageBuffers[uni] ? 'descargada' : 'falló'}`);
+    }
     const { anios, semanas, usuario, timezone, viewType } = req.query;
     const nombreUsuario = usuario || "Usuario"; // Valor por defecto
     const formatoVista = viewType || "bySemana"; // Por defecto usa el formato por semana
@@ -259,8 +302,8 @@ app.get("/api/reportes/pdf", async (req, res) => {
         doc.rect(xPos, yPos, dataColWidth * aniosArray.length, 30).stroke();
 
         try {
-          if (universityImages[uni] && fs.existsSync(universityImages[uni])) {
-            doc.image(universityImages[uni], xPos + 10, yPos + 5, {
+          if (imageBuffers[uni]) {
+            doc.image(imageBuffers[uni], xPos + 10, yPos + 5, {
               fit: [dataColWidth * aniosArray.length - 20, 20],
               align: "center",
             });
