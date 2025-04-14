@@ -146,27 +146,27 @@ app.get("/api/reportes/pdf", async (req, res) => {
     const universityImages = {
       UPQ: path.join(
         __dirname,
-        "../frontend/public/img/universidades/LOGO_UPQ.png"
+        "https://sies-image-server.onrender.com/frontend/public/img/universidades/LOGO_UPQ.png"
       ),
       UPSRJ: path.join(
         __dirname,
-        "../frontend/public/img/universidades/LOGO_UPSRJ.png"
+        "https://sies-image-server.onrender.com/frontend/public/img/universidades/LOGO_UPSRJ.png"
       ),
       UTEQ: path.join(
         __dirname,
-        "../frontend/public/img/universidades/LOGO_UTEQ.png"
+        "https://sies-image-server.onrender.com/frontend/public/img/universidades/LOGO_UTEQ.png"
       ),
       UTC: path.join(
         __dirname,
-        "../frontend/public/img/universidades/LOGO_UTC.png"
+        "https://sies-image-server.onrender.com/frontend/public/img/universidades/LOGO_UTC.png"
       ),
       UTSJR: path.join(
         __dirname,
-        "../frontend/public/img/universidades/LOGO_UTSJR.png"
+        "https://sies-image-server.onrender.com/frontend/public/img/universidades/LOGO_UTSJR.png"
       ),
       UNAQ: path.join(
         __dirname,
-        "../frontend/public/img/universidades/LOGO_UNAQ.png"
+        "https://sies-image-server.onrender.com/frontend/public/img/universidades/LOGO_UNAQ.png"
       ),
     };
 
