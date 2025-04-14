@@ -52,7 +52,7 @@ app.get("/api/reportes/pdf", async (req, res) => {
     };
     
     // URL para el logo del PDF
-    const pdfLogoUrl = `${IMAGE_SERVER_URL}/img/general/LOGO_pdf.png`;
+    //const pdfLogoUrl = `${IMAGE_SERVER_URL}/img/general/LOGO_pdf.png`;
     
     // Función para descargar imagen
     const downloadImage = async (url) => {
@@ -184,7 +184,7 @@ app.get("/api/reportes/pdf", async (req, res) => {
         fallbackDate.getSeconds()
       ).padStart(2, "0")}`;
     }
-
+/*
     // Mapeo de nombres de universidades a sus logos
     const universityImages = {
       UPQ: path.join(
@@ -212,7 +212,7 @@ app.get("/api/reportes/pdf", async (req, res) => {
         "../frontend/public/img/universidades/LOGO_UNAQ.png"
       ),
     };
-
+*/
     // Generar PDF según el tipo de vista
     if (formatoVista === "bySemana") {
       // Para cada página de un PDF, añadir encabezado común con logo
