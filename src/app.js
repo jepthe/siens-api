@@ -7,7 +7,7 @@ const db = require("./config/db");
 
 require("dotenv").config();
 const PRODUCTION_URL =
-  process.env.API_URL || "sies-image-server-production.up.railway.app"; //por si no se define la variable de entorno, resuelve imagen perfil
+  process.env.API_URL || "https://sies-image-server.onrender.com"; //por si no se define la variable de entorno, resuelve imagen perfil
 
 const app = express();
 
@@ -39,7 +39,7 @@ app.get("/api/reportes/pdf", async (req, res) => {
 
   try {
     // Configuración de la URL base del servidor de imágenes
-    const IMAGE_SERVER_URL = process.env.IMAGE_SERVER_URL || "sies-image-server-production.up.railway.app";
+    const IMAGE_SERVER_URL = process.env.IMAGE_SERVER_URL || "https://sies-image-server.onrender.com";
     
     // Mapeo de nombres de universidades a sus URLs
     const universityImageUrls = {
@@ -1240,7 +1240,7 @@ app.post("/api/auth/login", async (req, res) => {
     if (user.cImagen) {
       // Ensure we're using HTTPS for production
       const baseUrl =
-        process.env.API_URL || "sies-image-server-production.up.railway.app";
+        process.env.API_URL || "https://sies-image-server.onrender.com";
 
       // Properly format the image URL
       if (
