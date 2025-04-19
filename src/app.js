@@ -1255,7 +1255,7 @@ app.post("/api/auth/login", async (req, res) => {
       } else if (user.cImagen.startsWith("/img/")) {
         safeResponse.user.cImagen = `${baseUrl}${user.cImagen}`;
       } else {
-        safeResponse.user.cImagen = `${baseUrl}/img/universidades/${user.cImagen}`;
+        safeResponse.user.cImagen = `${baseUrl}/img/${user.cImagen}`;
       }
 
       console.log("URL de imagen generada:", safeResponse.user.cImagen);
