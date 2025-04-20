@@ -251,7 +251,11 @@ app.get("/api/reportes/pdf", async (req, res) => {
     // Generar PDF según el tipo de vista
     if (formatoVista === "bySemana") {
       // Para cada página de un PDF, añadir encabezado común con logo
-      const addCommonHeader = (isFirstPage = false) => {
+      const addCommonHeader = (
+        isFirstPage = false,
+        pageNumber = 1,
+        totalPages = 1
+      ) => {
         // Añadir el logo en la esquina superior izquierda (solo primera página)
         if (isFirstPage) {
           try {
@@ -288,9 +292,12 @@ app.get("/api/reportes/pdf", async (req, res) => {
           // Información del documento
           doc
             .fontSize(10)
-            .text(`Fecha: ${formattedDate} | Hora: ${formattedTime}`, {
-              align: "right",
-            })
+            .text(
+              `Fecha: ${formattedDate} | Hora: ${formattedTime} | Página ${pageNumber} de ${totalPages}`,
+              {
+                align: "right",
+              }
+            )
             .text(`Generado por: ${nombreUsuario}`, { align: "right" });
 
           doc.moveDown(2);
@@ -298,18 +305,26 @@ app.get("/api/reportes/pdf", async (req, res) => {
           doc.fontSize(14).text("Concentrado de Universidades (continuación)", {
             align: "center",
           });
+
+          // Añadir información de página en páginas adicionales
+          doc.fontSize(10).text(`Página ${pageNumber} de ${totalPages}`, {
+            align: "right",
+          });
+
           doc.moveDown();
         }
       };
 
       // Añadir encabezado común para la primera página
-      addCommonHeader(true);
 
       // *** VISTA POR SEMANA: Crear tabla optimizada en una sola página ***
 
       // Determinar todas las semanas disponibles hasta el límite seleccionado
       const semanasArray = Array.from({ length: semanasNum }, (_, i) => i + 1);
-
+      // Calcular el número total estimado de páginas basado en datos
+      let currentPage = 1;
+      let totalPages = Math.ceil(semanasArray.length / 15) || 1; // Estimación inicial
+      addCommonHeader(true, currentPage, totalPages);
       // Calcular ancho de las columnas //resize
       const pageWidth = doc.page.width - 60; // 40px de margen en cada lado
       const firstColWidth = 60; // Ancho de la primera columna (semanas)
@@ -397,10 +412,13 @@ app.get("/api/reportes/pdf", async (req, res) => {
         // Si necesitamos una nueva página
         if (yPos > doc.page.height - 100) {
           doc.addPage();
-          yPos = 60; // Reiniciar posición Y
+          currentPage++;
+          // Actualizar el total de páginas si es necesario
+          totalPages = Math.max(totalPages, currentPage);
+          yPos = 70; // Reiniciar posición Y
 
           // Añadir encabezados comunes para páginas adicionales
-          addCommonHeader(false);
+          addCommonHeader(false, currentPage, totalPages);
 
           // Dibujar el encabezado de nuevo
           doc.rect(40, yPos, pageWidth, 60).fillAndStroke("#f5f5f5", "#cccccc");
@@ -754,9 +772,14 @@ app.get("/api/reportes/pdf", async (req, res) => {
           // Información del documento
           doc
             .fontSize(10)
-            .text(`Fecha: ${formattedDate} | Hora: ${formattedTime}`, {
-              align: "right",
-            })
+            .text(
+              `Fecha: ${formattedDate} | Hora: ${formattedTime} | Página ${
+                pageIndex + 1
+              } de ${semanaGroups.length}`,
+              {
+                align: "right",
+              }
+            )
             .text(`Generado por: ${nombreUsuario}`, { align: "right" });
 
           // Indicar rango de semanas en esta página
@@ -780,6 +803,13 @@ app.get("/api/reportes/pdf", async (req, res) => {
           doc.fontSize(14).text(`Concentrado de Universidades (continuación)`, {
             align: "center",
           });
+
+          // Agregar información de página
+          doc
+            .fontSize(10)
+            .text(`Página ${pageIndex + 1} de ${semanaGroups.length}`, {
+              align: "right",
+            });
 
           // Indicar rango de semanas en esta página
           doc
@@ -1032,7 +1062,7 @@ app.get("/api/reportes/pdf", async (req, res) => {
       });
     }
 
-    // Numerar páginas
+    /*// Numerar páginas
     const totalPages = doc.bufferedPageRange().count;
     for (let i = 0; i < totalPages; i++) {
       doc.switchToPage(i);
@@ -1042,7 +1072,7 @@ app.get("/api/reportes/pdf", async (req, res) => {
         .text(`Página ${i + 1} de ${totalPages}`, 40, doc.page.height - 40, {
           align: "center",
         });
-    }
+    }*/
 
     // Finalizar el documento
     doc.end();
