@@ -1,13 +1,12 @@
 // src/app.js
-const axios = require('axios');
+const axios = require("axios");
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const db = require("./config/db");
 
 require("dotenv").config();
-const PRODUCTION_URL =
-  process.env.API_URL || "https://sies-image-server-production.up.railway.app"; //por si no se define la variable de entorno, resuelve imagen perfil
+const PRODUCTION_URL = process.env.API_URL || "https://sies-image-server-production.up.railway.app"; //por si no se define la variable de entorno, resuelve imagen perfil
 
 const app = express();
 
@@ -39,7 +38,7 @@ app.get("/api/reportes/pdf", async (req, res) => {
 
   try {
     // Configuración de la URL base del servidor de imágenes
-    const IMAGE_SERVER_URL = process.env.IMAGE_SERVER_URL || "https://sies-image-server-production.up.railway.app";
+    /*const IMAGE_SERVER_URL = process.env.IMAGE_SERVER_URL || "https://sies-image-server-production.up.railway.app";
     
     // Mapeo de nombres de universidades a sus URLs
     const universityImageUrls = {
@@ -79,7 +78,7 @@ app.get("/api/reportes/pdf", async (req, res) => {
     for (const [uni, url] of Object.entries(universityImageUrls)) {
       imageBuffers[uni] = await downloadImage(url);
       console.log(`Imagen de ${uni} ${imageBuffers[uni] ? 'descargada' : 'falló'}`);
-    }
+    }*/
     const { anios, semanas, usuario, timezone, viewType } = req.query;
     const nombreUsuario = usuario || "Usuario"; // Valor por defecto
     const formatoVista = viewType || "bySemana"; // Por defecto usa el formato por semana
@@ -113,6 +112,42 @@ app.get("/api/reportes/pdf", async (req, res) => {
 
     // Obtener la lista de universidades
     const UNIVERSITIES = Object.keys(reporteData);
+
+    // Configuración de la URL base del servidor de imágenes
+    const IMAGE_SERVER_URL =
+      process.env.IMAGE_SERVER_URL || "https://sies-image-server-production.up.railway.app";
+
+    // Crear mapeo de universidades a URLs de manera dinámica
+    const universityImageUrls = {};
+    UNIVERSITIES.forEach((uni) => {
+      universityImageUrls[
+        uni
+      ] = `${IMAGE_SERVER_URL}/img/universidades/LOGO_${uni}.png`;
+    });
+
+    // Función para descargar imagen
+    const downloadImage = async (url) => {
+      try {
+        const response = await axios.get(url, {
+          responseType: "arraybuffer",
+        });
+        return Buffer.from(response.data, "binary");
+      } catch (error) {
+        console.error("Error descargando imagen:", url, error.message);
+        return null;
+      }
+    };
+
+    // Objeto para almacenar los buffers de imágenes
+    const imageBuffers = {};
+
+    // Descargar logos de universidades
+    for (const [uni, url] of Object.entries(universityImageUrls)) {
+      imageBuffers[uni] = await downloadImage(url);
+      console.log(
+        `Imagen de ${uni} ${imageBuffers[uni] ? "descargada" : "falló"}`
+      );
+    }
 
     // Crear el documento PDF
     const doc = new PDFDocument({
@@ -423,12 +458,10 @@ app.get("/api/reportes/pdf", async (req, res) => {
 
         // Celda de semana
         doc.rect(40, yPos, firstColWidth, 30).stroke();
-        doc
-          .fillColor("#000000")
-          .text(`S${semana}`, 50, yPos + 10, {
-            width: firstColWidth - 20,
-            align: "center",
-          });
+        doc.fillColor("#000000").text(`S${semana}`, 50, yPos + 10, {
+          width: firstColWidth - 20,
+          align: "center",
+        });
 
         // Inicializar total de fila
         let rowTotal = 0;
@@ -492,12 +525,10 @@ app.get("/api/reportes/pdf", async (req, res) => {
       doc.rect(40, yPos, pageWidth, 40).fillAndStroke("#e6f7ff", "#000000");
       doc.fillColor("#000000");
       doc.rect(40, yPos, firstColWidth, 40).stroke();
-      doc
-        .fontSize(12)
-        .text("Totales", 50, yPos + 15, {
-          width: firstColWidth - 20,
-          align: "center",
-        });
+      doc.fontSize(12).text("Totales", 50, yPos + 15, {
+        width: firstColWidth - 20,
+        align: "center",
+      });
 
       // Inicializar total general
       let grandTotal = 0;
@@ -863,13 +894,34 @@ app.get("/api/reportes/pdf", async (req, res) => {
 
           // Celda de universidad
           doc.rect(40, yPos, firstColWidth, 25).stroke();
-          doc
-            .fillColor("#000000")
-            .fontSize(8)
-            .text(uni, 45, yPos + 8, {
-              width: firstColWidth - 10,
-              align: "center",
-            });
+          try {
+            if (imageBuffers[uni]) {
+              // Si tenemos la imagen cargada, usarla
+              doc.image(imageBuffers[uni], 40 + 2, yPos + 2, {
+                fit: [firstColWidth - 4, 21],
+                align: "center",
+                valign: "center",
+              });
+            } else {
+              // Si no hay imagen, mostrar el texto
+              doc
+                .fillColor("#000000")
+                .fontSize(8)
+                .text(uni, 45, yPos + 8, {
+                  width: firstColWidth - 10,
+                  align: "center",
+                });
+            }
+          } catch (err) {
+            // En caso de error, mostrar el texto
+            doc
+              .fillColor("#000000")
+              .fontSize(8)
+              .text(uni, 45, yPos + 8, {
+                width: firstColWidth - 10,
+                align: "center",
+              });
+          }
 
           // Celdas de datos
           xPos = 40 + firstColWidth;
@@ -936,12 +988,10 @@ app.get("/api/reportes/pdf", async (req, res) => {
         doc.rect(40, yPos, tableWidth, 35).fillAndStroke("#e6f7ff", "#000000");
         doc.fillColor("#000000");
         doc.rect(40, yPos, firstColWidth, 35).stroke();
-        doc
-          .fontSize(9)
-          .text("Totales", 45, yPos + 12, {
-            width: firstColWidth - 10,
-            align: "center",
-          });
+        doc.fontSize(9).text("Totales", 45, yPos + 12, {
+          width: firstColWidth - 10,
+          align: "center",
+        });
 
         // Celdas de totales por columna
         xPos = 40 + firstColWidth;
@@ -1239,8 +1289,7 @@ app.post("/api/auth/login", async (req, res) => {
     // Si existe cImagen, añadirla al objeto de respuesta con la ruta completa
     if (user.cImagen) {
       // Ensure we're using HTTPS for production
-      const baseUrl =
-        process.env.API_URL || "https://sies-image-server-production.up.railway.app";
+      const baseUrl = process.env.API_URL || "https://sies-image-server-production.up.railway.app";
 
       // Properly format the image URL
       if (
