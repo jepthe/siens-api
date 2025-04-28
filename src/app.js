@@ -1285,7 +1285,18 @@ app.post("/api/auth/login", async (req, res) => {
     }
 
     // Verificar la contraseña
-    if (user.cContraseña !== password) {
+    const bcrypt = require('bcryptjs');
+    let isPasswordCorrect;
+
+    if (user.cContraseña.startsWith('$2')) {
+      // La contraseña está hasheada con bcrypt
+      isPasswordCorrect = await bcrypt.compare(password, user.cContraseña);
+    } else {
+      // La contraseña está en texto plano
+      isPasswordCorrect = password === user.cContraseña;
+    }
+
+    if (!isPasswordCorrect) {
       console.log("Contraseña incorrecta");
       return res.status(401).json({
         message: "Credenciales incorrectas",

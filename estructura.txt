@@ -1,19 +1,9 @@
-.
+siens-api/
 ├── frontend
 │   └── public
 │       └── img
-│           ├── general
-│           │   ├── Jacinto.jpg
-│           │   ├── LOGO_pdf.png
-│           │   └── Norma.jpg
-│           └── universidades
-│               ├── LOGO_UNAQ.png
-│               ├── LOGO_UPQ.png
-│               ├── LOGO_UPSRJ.png
-│               ├── LOGO_UTC.png
-│               ├── LOGO_UTEQ.png
-│               └── LOGO_UTSJR.png
-├── node_modules
+│           └── general
+│               └── LOGO_pdf.png
 ├── package-lock.json
 ├── package.json
 ├── src
@@ -40,3 +30,4 @@
 │   └── utils
 │       └── asyncHandler.js
 └── tmp
+    └── img
