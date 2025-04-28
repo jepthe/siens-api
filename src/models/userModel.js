@@ -7,9 +7,10 @@ const userModel = {
   findByUsername: async (username) => {
     try {
       const [rows] = await db.query(
-        `SELECT u.*, r.cNombreRol AS nombreRol 
+        `SELECT u.*, r.cNombreRol AS nombreRol, d.cCorreo, d.cNombreCompleto 
          FROM tdusuario u
          LEFT JOIN tcrol r ON u.iIdRol = r.iIdRol
+         LEFT JOIN tddetallesusuario d ON u.iIdUsuario = d.iIdUsuario
          WHERE u.cNombreUsuario = ?`,
         [username]
       );
@@ -20,14 +21,15 @@ const userModel = {
   },
 
   // Método para buscar usuario por nombre de usuario
-  findByEmail: async (username) => {
+  findByEmail: async (email) => {
     try {
       const [rows] = await db.query(
-        `SELECT u.*, r.cNombreRol AS nombreRol
-          FROM tcUsuario u
+        `SELECT u.*, r.cNombreRol AS nombreRol, d.cCorreo, d.cNombreCompleto 
+         FROM tdusuario u
          LEFT JOIN tcrol r ON u.iIdRol = r.iIdRol
-         WHERE u.cNombreUsuario = ?`,
-        [username]
+         LEFT JOIN tddetallesusuario d ON u.iIdUsuario = d.iIdUsuario
+         WHERE d.cCorreo = ?`,
+        [email]
       );
       return rows[0];
     } catch (error) {

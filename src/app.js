@@ -1240,7 +1240,7 @@ app.get("/api/reportes/universidad/:idUniversidad", async (req, res) => {
     res.status(500).json({ message: "Error interno del servidor" });
   }
 });
-
+/*
 // Endpoint para login
 app.post("/api/auth/login", async (req, res) => {
   try {
@@ -1358,7 +1358,7 @@ app.post("/api/auth/login", async (req, res) => {
       message: "Error interno del servidor",
     });
   }
-});
+});*/
 
 // Endpoint para obtener datos de todas las universidades
 app.get("/api/reportes/todas", async (req, res) => {

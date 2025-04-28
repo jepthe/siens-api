@@ -173,7 +173,7 @@ const resetPassword = asyncHandler(async (req, res) => {
           <p>Hola ${user.cNombreUsuario},</p>
           <p>Has solicitado restablecer tu contraseña en el sistema SIENS.</p>
           <p>Tu nueva contraseña es: <strong>${newPassword}</strong></p>
-          <p>Por motivos de seguridad, te recomendamos cambiar esta contraseña después de iniciar sesión.</p>
+          <p>Por motivos de seguridad, te recomendamos cambiar esta contraseña (hacerlo en la página web) después de iniciar sesión.</p>
           <p>Si no solicitaste este cambio, por favor contacta al administrador del sistema inmediatamente.</p>
           <p style="margin-top: 30px;">Saludos,<br>Equipo SIENS</p>
         </div>
