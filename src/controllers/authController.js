@@ -79,11 +79,11 @@ const login = asyncHandler(async (req, res) => {
       // Forzar HTTPS por seguridad
       imageUrl = imageUrl.replace(/^http:\/\//i, 'https://');
     } 
-    else if (imageUrl.startsWith('/img/')) {
+    else if (imageUrl.startsWith('/images/')) {
       imageUrl = `${baseUrl}${imageUrl}`;
     }
     else {
-      imageUrl = `${baseUrl}/img/${imageUrl}`;
+      imageUrl = `${baseUrl}/images/${imageUrl}`;
     }
   }
 
