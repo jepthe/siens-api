@@ -72,7 +72,7 @@ const login = asyncHandler(async (req, res) => {
   // 5) Procesar la URL de la imagen si existe
   let imageUrl = user.cImagen;
   if (imageUrl) {
-    const baseUrl = process.env.API_URL || 'https://sies-image-server-production.up.railway.app';
+    const IMAGE_SERVER_URL = process.env.IMAGE_SERVER_URL || 'https://sies-image-server-production.up.railway.app';
     
     // Formatear correctamente la URL de la imagen
     if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
@@ -80,10 +80,10 @@ const login = asyncHandler(async (req, res) => {
       imageUrl = imageUrl.replace(/^http:\/\//i, 'https://');
     } 
     else if (imageUrl.startsWith('/img/')) {
-      imageUrl = `${baseUrl}${imageUrl}`;
+      imageUrl = `${IMAGE_SERVER_URL}${imageUrl}`;
     }
     else {
-      imageUrl = `${baseUrl}/img/${imageUrl}`;
+      imageUrl = `${IMAGE_SERVER_URL}/img/${imageUrl}`;
     }
   }
 

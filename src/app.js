@@ -6,7 +6,6 @@ const path = require("path");
 const db = require("./config/db");
 
 require("dotenv").config();
-const PRODUCTION_URL = process.env.API_URL || "https://sies-image-server-production.up.railway.app"; //por si no se define la variable de entorno, resuelve imagen perfil
 
 const app = express();
 
@@ -37,48 +36,6 @@ app.get("/api/reportes/pdf", async (req, res) => {
   const pdfPath = path.join(tmpDir, pdfFileName);
 
   try {
-    // Configuración de la URL base del servidor de imágenes
-    /*const IMAGE_SERVER_URL = process.env.IMAGE_SERVER_URL || "https://sies-image-server-production.up.railway.app";
-    
-    // Mapeo de nombres de universidades a sus URLs
-    const universityImageUrls = {
-      UPQ: `${IMAGE_SERVER_URL}/img/universidades/LOGO_UPQ.png`,
-      UPSRJ: `${IMAGE_SERVER_URL}/img/universidades/LOGO_UPSRJ.png`,
-      UTEQ: `${IMAGE_SERVER_URL}/img/universidades/LOGO_UTEQ.png`,
-      UTC: `${IMAGE_SERVER_URL}/img/universidades/LOGO_UTC.png`,
-      UTSJR: `${IMAGE_SERVER_URL}/img/universidades/LOGO_UTSJR.png`,
-      UNAQ: `${IMAGE_SERVER_URL}/img/universidades/LOGO_UNAQ.png`
-    };
-    
-    // URL para el logo del PDF
-    //const pdfLogoUrl = `${IMAGE_SERVER_URL}/img/general/LOGO_pdf.png`;
-    
-    // Función para descargar imagen
-    const downloadImage = async (url) => {
-      try {
-        const response = await axios.get(url, {
-          responseType: 'arraybuffer'
-        });
-        return Buffer.from(response.data, 'binary');
-      } catch (error) {
-        console.error('Error descargando imagen:', url, error.message);
-        return null;
-      }
-    };
-    
-    // Descargar todas las imágenes necesarias al inicio
-    console.log("Descargando imágenes...");
-    
-    // Objeto para almacenar los buffers de imágenes
-    const imageBuffers = {
-     
-    };
-    
-    // Descargar logos de universidades
-    for (const [uni, url] of Object.entries(universityImageUrls)) {
-      imageBuffers[uni] = await downloadImage(url);
-      console.log(`Imagen de ${uni} ${imageBuffers[uni] ? 'descargada' : 'falló'}`);
-    }*/
     const { anios, semanas, usuario, timezone, viewType } = req.query;
     const nombreUsuario = usuario || "Usuario"; // Valor por defecto
     const formatoVista = viewType || "bySemana"; // Por defecto usa el formato por semana
@@ -114,8 +71,7 @@ app.get("/api/reportes/pdf", async (req, res) => {
     const UNIVERSITIES = Object.keys(reporteData);
 
     // Configuración de la URL base del servidor de imágenes
-    const IMAGE_SERVER_URL =
-      process.env.IMAGE_SERVER_URL || "https://sies-image-server-production.up.railway.app";
+    const IMAGE_SERVER_URL = process.env.IMAGE_SERVER_URL || "https://sies-image-server-production.up.railway.app";
 
     // Crear mapeo de universidades a URLs de manera dinámica
     const universityImageUrls = {};
