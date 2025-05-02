@@ -79,11 +79,11 @@ const login = asyncHandler(async (req, res) => {
       // Forzar HTTPS por seguridad
       imageUrl = imageUrl.replace(/^http:\/\//i, 'https://');
     } 
-    else if (imageUrl.startsWith('/images/')) {
+    else if (imageUrl.startsWith('/img/')) {
       imageUrl = `${baseUrl}${imageUrl}`;
     }
     else {
-      imageUrl = `${baseUrl}/images/${imageUrl}`;
+      imageUrl = `${baseUrl}/img/${imageUrl}`;
     }
   }
 
@@ -193,7 +193,36 @@ const resetPassword = asyncHandler(async (req, res) => {
   });
 });
 
+const verifyToken = asyncHandler(async (req, res) => {
+  // El usuario ya está disponible en req.user gracias al middleware protect
+  const userId = req.user.id;
+  
+  // Buscar los datos completos del usuario
+  const user = await userModel.findById(userId);
+  
+  if (!user) {
+    return res.status(404).json({
+      status: 'fail',
+      message: 'Usuario no encontrado'
+    });
+  }
+  
+  // Enviar datos del usuario
+  res.status(200).json({
+    status: 'success',
+    user: {
+      iIdUsuario: user.iIdUsuario,
+      cNombreUsuario: user.cNombreUsuario,
+      iIdRol: user.iIdRol,
+      nombreRol: user.nombreRol,
+      iIdUniversidad: user.iIdUniversidad,
+      cImagen: user.cImagen
+    }
+  });
+});
+
 module.exports = { 
   login,
-  resetPassword
+  resetPassword,
+  verifyToken  // Exportar la nueva función
 };

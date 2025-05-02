@@ -1092,6 +1092,8 @@ app.get("/api/reportes/pdf", async (req, res) => {
 });
 
 const authRoutes = require("./routes/authRoutes");
+const reporteRoutes = require('./routes/reporteRoutes');
+const universidadRoutes = require('./routes/universidadRoutes');
 
 // Middleware
 app.use(cors());
@@ -1315,6 +1317,9 @@ app.get("/api/reportes/todas", async (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+// Rutas protegidas (con autenticación)
+app.use('/api/reportes', reporteRoutes);
+app.use('/api/universidades', universidadRoutes);
 
 // Manejador de errores global
 app.use((err, req, res, next) => {

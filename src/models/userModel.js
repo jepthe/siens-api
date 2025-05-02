@@ -4,6 +4,22 @@ const bcrypt = require('bcryptjs');
 
 const userModel = {
 
+  findById: async (userId) => {
+    try {
+      const [rows] = await db.query(
+        `SELECT u.*, r.cNombreRol AS nombreRol, d.cCorreo, d.cNombreCompleto 
+         FROM tdusuario u
+         LEFT JOIN tcrol r ON u.iIdRol = r.iIdRol
+         LEFT JOIN tddetallesusuario d ON u.iIdUsuario = d.iIdUsuario
+         WHERE u.iIdUsuario = ?`,
+        [userId]
+      );
+      return rows[0];
+    } catch (error) {
+      throw error;
+    }
+  },
+
   findByUsername: async (username) => {
     try {
       const [rows] = await db.query(
