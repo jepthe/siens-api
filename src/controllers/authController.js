@@ -72,7 +72,7 @@ const login = asyncHandler(async (req, res) => {
   // 5) Procesar la URL de la imagen si existe
   let imageUrl = user.cImagen;
   if (imageUrl) {
-    const IMAGE_SERVER_URL = process.env.IMAGE_SERVER_URL || 'https://sies-image-server-production.up.railway.app';
+    const IMAGE_SERVER_URL = process.env.IMAGE_SERVER_URL || 'http://localhost:4000';
     
     // Formatear correctamente la URL de la imagen
     if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {

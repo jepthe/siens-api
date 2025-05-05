@@ -71,7 +71,7 @@ app.get("/api/reportes/pdf", async (req, res) => {
     const UNIVERSITIES = Object.keys(reporteData);
 
     // Configuración de la URL base del servidor de imágenes
-    const IMAGE_SERVER_URL = process.env.IMAGE_SERVER_URL || "https://sies-image-server-production.up.railway.app";
+    const IMAGE_SERVER_URL = process.env.IMAGE_SERVER_URL || "http://localhost:4000";
 
     // Crear mapeo de universidades a URLs de manera dinámica
     const universityImageUrls = {};
