@@ -9,11 +9,7 @@ require("dotenv").config();
 
 const app = express();
 
-// Importar moment-timezone al inicio del archivo
-const moment = require("moment-timezone");
-
 //pdf
-// En el backend (app.js)
 const PDFDocument = require("pdfkit");
 const fs = require("fs");
 const fichaModel = require("./models/fichaModel");
@@ -189,7 +185,7 @@ app.get("/api/reportes/pdf", async (req, res) => {
           try {
             const logoPath = path.join(
               __dirname,
-              "../frontend/public/img/general/LOGO_pdf.png"
+              "../img/LOGO_pdf.png"
             );
 
             if (fs.existsSync(logoPath)) {
@@ -671,7 +667,7 @@ app.get("/api/reportes/pdf", async (req, res) => {
           try {
             const logoPath = path.join(
               __dirname,
-              "../frontend/public/img/general/LOGO_pdf.png"
+              "../img/LOGO_pdf.png"
             );
 
             if (fs.existsSync(logoPath)) {
@@ -1108,19 +1104,18 @@ app.get("/api/reportes/universidad/:idUniversidad", async (req, res) => {
     // Consulta para las fichas de esta universidad
     const [fichas] = await db.query(
       `SELECT 
-      f.iIdFicha, f.iIdUniversidad, f.iIdCarrera, f.iIdBachillerato,
-      f.iIdAnio, a.cAnio as anio, 
-      f.iIdSemana, s.iNumeroSemana as semana,
-      f.iHombre, f.iMujer, f.iCantidad 
-    FROM 
-      tdficha f
-      JOIN tcanio a ON f.iIdAnio = a.iIdAnio
-      JOIN tcsemana s ON f.iIdSemana = s.iIdSemana
-    WHERE 
-      f.iIdUniversidad = ?
-      AND s.iNumeroSemana <= ?
-    ORDER BY 
-      a.cAnio, s.iNumeroSemana`,
+        a.cAnio as anio, 
+        s.iNumeroSemana as semana,
+        f.iCantidad 
+      FROM 
+        tdficha f
+        JOIN tcanio a ON f.iIdAnio = a.iIdAnio
+        JOIN tcsemana s ON f.iIdSemana = s.iIdSemana
+      WHERE 
+        f.iIdUniversidad = ?
+        AND s.iNumeroSemana <= ?
+      ORDER BY 
+        a.cAnio, s.iNumeroSemana`,
       [idUniversidad, semanas]
     );
 
@@ -1205,19 +1200,18 @@ app.get("/api/reportes/todas", async (req, res) => {
       // Consulta para las fichas de esta universidad
       const [fichas] = await db.query(
         `SELECT 
-        f.iIdFicha, f.iIdUniversidad, f.iIdCarrera, f.iIdBachillerato,
-        f.iIdAnio, a.cAnio as anio, 
-        f.iIdSemana, s.iNumeroSemana as semana,
-        f.iHombre, f.iMujer, f.iCantidad 
-      FROM 
-        tdficha f
-        JOIN tcanio a ON f.iIdAnio = a.iIdAnio
-        JOIN tcsemana s ON f.iIdSemana = s.iIdSemana
-      WHERE 
-        f.iIdUniversidad = ?
-        AND s.iNumeroSemana <= ?
-      ORDER BY 
-        a.cAnio, s.iNumeroSemana`,
+          a.cAnio as anio, 
+          s.iNumeroSemana as semana,
+          f.iCantidad 
+        FROM 
+          tdficha f
+          JOIN tcanio a ON f.iIdAnio = a.iIdAnio
+          JOIN tcsemana s ON f.iIdSemana = s.iIdSemana
+        WHERE 
+          f.iIdUniversidad = ?
+          AND s.iNumeroSemana <= ?
+        ORDER BY 
+          a.cAnio, s.iNumeroSemana`,
         [universidadId, semanas]
       );
 

@@ -2,7 +2,7 @@
 const db = require('../config/db');
 
 const fichaModel = {
-  findByUniversidadAnioSemana: async (universidadId, anioId, semanaId) => {
+  /*findByUniversidadAnioSemana: async (universidadId, anioId, semanaId) => {
     try {
       const [rows] = await db.query(
         `SELECT * FROM tdficha 
@@ -13,7 +13,7 @@ const fichaModel = {
     } catch (error) {
       throw error;
     }
-  },
+  },*/
 
   // Obtener datos para reportes por universidad
   getReporteByUniversidad: async (universidadId, anios, semanas) => {

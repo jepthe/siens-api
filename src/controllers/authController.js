@@ -92,11 +92,8 @@ const login = asyncHandler(async (req, res) => {
     status: 'success',
     token,
     user: {
-      iIdUsuario: user.iIdUsuario,
       cNombreUsuario: user.cNombreUsuario,
-      iIdRol: user.iIdRol,
       nombreRol: user.nombreRol,
-      iIdUniversidad: user.iIdUniversidad,
       cImagen: imageUrl
     }
   });
@@ -211,11 +208,8 @@ const verifyToken = asyncHandler(async (req, res) => {
   res.status(200).json({
     status: 'success',
     user: {
-      iIdUsuario: user.iIdUsuario,
       cNombreUsuario: user.cNombreUsuario,
-      iIdRol: user.iIdRol,
       nombreRol: user.nombreRol,
-      iIdUniversidad: user.iIdUniversidad,
       cImagen: user.cImagen
     }
   });
@@ -224,5 +218,5 @@ const verifyToken = asyncHandler(async (req, res) => {
 module.exports = { 
   login,
   resetPassword,
-  verifyToken  // Exportar la nueva función
+  verifyToken  // 
 };
